@@ -5,7 +5,18 @@ project(crossplatform_hello_world VERSION 1.0)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang|GNU")
+  set(CMAKE_CXX_FLAGS_DEBUG
+      "${CMAKE_CXX_FLAGS_DEBUG} 
+      -Wall 
+      -Wextra 
+      -Wshadow 
+      -Werror 
+      -Wunnused 
+      -pedantic 
+      -fsanitize=address"
+  )
+endif()
 
 add_subdirectory(libmyprint/)
 add_subdirectory(${PROJECT_NAME}/)
