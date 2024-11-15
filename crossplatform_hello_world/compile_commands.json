@@ -1,14 +1,14 @@
 [
 {
-  "directory": "/home/helf4ch/Projects/OpSystems/Lab1/tmp/libmyprint/libmyprint",
-  "command": "/usr/bin/c++  -I/home/helf4ch/Projects/OpSystems/Lab1/libmyprint -std=gnu++17 -o CMakeFiles/libmyprint.dir/libmyprint.cpp.o -c /home/helf4ch/Projects/OpSystems/Lab1/libmyprint/libmyprint/libmyprint.cpp",
-  "file": "/home/helf4ch/Projects/OpSystems/Lab1/libmyprint/libmyprint/libmyprint.cpp",
+  "directory": "/home/helf4ch/Projects/OpSystems/crossplatform_hello_world/tmp/libmyprint/libmyprint",
+  "command": "/usr/bin/c++  -I/home/helf4ch/Projects/OpSystems/crossplatform_hello_world/libmyprint -std=gnu++17 -o CMakeFiles/libmyprint.dir/libmyprint.cpp.o -c /home/helf4ch/Projects/OpSystems/crossplatform_hello_world/libmyprint/libmyprint/libmyprint.cpp",
+  "file": "/home/helf4ch/Projects/OpSystems/crossplatform_hello_world/libmyprint/libmyprint/libmyprint.cpp",
   "output": "libmyprint/libmyprint/CMakeFiles/libmyprint.dir/libmyprint.cpp.o"
 },
 {
-  "directory": "/home/helf4ch/Projects/OpSystems/Lab1/tmp/crossplatform_hello_world",
-  "command": "/usr/bin/c++  -I/home/helf4ch/Projects/OpSystems/Lab1/libmyprint -std=gnu++17 -o CMakeFiles/crossplatform_hello_world.dir/main.cpp.o -c /home/helf4ch/Projects/OpSystems/Lab1/crossplatform_hello_world/main.cpp",
-  "file": "/home/helf4ch/Projects/OpSystems/Lab1/crossplatform_hello_world/main.cpp",
+  "directory": "/home/helf4ch/Projects/OpSystems/crossplatform_hello_world/tmp/crossplatform_hello_world",
+  "command": "/usr/bin/c++  -I/home/helf4ch/Projects/OpSystems/crossplatform_hello_world/libmyprint -std=gnu++17 -o CMakeFiles/crossplatform_hello_world.dir/main.cpp.o -c /home/helf4ch/Projects/OpSystems/crossplatform_hello_world/crossplatform_hello_world/main.cpp",
+  "file": "/home/helf4ch/Projects/OpSystems/crossplatform_hello_world/crossplatform_hello_world/main.cpp",
   "output": "crossplatform_hello_world/CMakeFiles/crossplatform_hello_world.dir/main.cpp.o"
 }
 ]

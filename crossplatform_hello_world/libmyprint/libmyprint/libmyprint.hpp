@@ -2,4 +2,8 @@
 
 #include <string>
 
-void my_print(const std::string &text);
+namespace my {
+
+void print(const std::string &text);
+
+}
