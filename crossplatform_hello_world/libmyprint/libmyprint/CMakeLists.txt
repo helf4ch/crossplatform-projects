@@ -1,1 +1,1 @@
-add_library(${PROJECT_NAME} libmyprint.cpp)
+add_library(${PROJECT_NAME} myprint.cpp)

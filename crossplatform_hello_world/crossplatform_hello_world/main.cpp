@@ -1,4 +1,4 @@
-#include "libmyprint/libmyprint.hpp"
+#include "libmyprint/myprint.hpp"
 
 int main() {
   my::print("Hello, world!");
