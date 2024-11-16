@@ -48,7 +48,7 @@ char **to_c_style_str_list(const std::vector<std::string> &v) {
 
 void free_c_style_str_list(char ***list, size_t n) {
   for (auto i = 0; i < n; ++i) {
-    delete *list[i];
+    delete (*list)[i];
   }
   delete *list;
 }
