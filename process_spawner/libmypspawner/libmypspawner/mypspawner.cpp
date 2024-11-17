@@ -2,8 +2,8 @@
 #include <csignal>
 #include <cstddef>
 #include <cstring>
-#include <sys/wait.h>
 #include <spawn.h>
+#include <sys/wait.h>
 
 class my::PSpawner::PSpawnerImpl {
 public:
@@ -66,7 +66,7 @@ void my::PSpawner::start() {
 }
 
 bool my::PSpawner::is_running() {
-  auto res = kill(spawner->pid, 0);
+  auto res = ::kill(spawner->pid, 0);
   if (!res) {
     spawner->is_running = true;
   } else {
@@ -76,15 +76,14 @@ bool my::PSpawner::is_running() {
 }
 
 // TODO: add exception for any error
-void my::PSpawner::wait() {
-  if (!spawner->is_running) {
-    return;
-  }
+int my::PSpawner::wait() {
   int status;
   int res = waitpid(spawner->pid, &status, 0);
-  if (res != spawner->pid) {
-    return;
-  }
+  return status;
+}
+
+void my::PSpawner::kill() {
+  ::kill(spawner->pid, SIGTERM);
 }
 
 int my::PSpawner::get_pid() const noexcept { return spawner->pid; }

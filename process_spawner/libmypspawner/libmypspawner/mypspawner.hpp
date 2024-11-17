@@ -17,7 +17,9 @@ public:
 
   bool is_running();
 
-  void wait();
+  int wait();
+
+  void kill();
 
   int get_pid() const noexcept;
 

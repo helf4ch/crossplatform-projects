@@ -24,10 +24,11 @@ int main() {
 
   std::cout << "[root] starting wait...\n";
 
-  spawner.wait();
+  auto status = spawner.wait();
 
   std::cout << "[root] wait is done\n";
   std::cout << "[root] is_running: " << spawner.is_running() << '\n';
+  std::cout << "[root] return code: " << status << '\n';
 
   return 0;
 }
