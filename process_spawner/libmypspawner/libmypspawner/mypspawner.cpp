@@ -2,8 +2,18 @@
 #include <csignal>
 #include <cstddef>
 #include <cstring>
+
+#ifdef WIN32
+
+#include <sstream>
+#include <windows.h>
+
+#else
+
 #include <spawn.h>
 #include <sys/wait.h>
+
+#endif
 
 class my::PSpawner::PSpawnerImpl {
 public:
@@ -11,24 +21,27 @@ public:
 
   std::string path;
 
-  std::string pname;
-
   std::vector<std::string> argv;
 
   std::vector<std::string> envp;
 
   bool is_running;
+
+#ifdef WIN32
+
+  HANDLE h_process;
+
+#endif
 };
 
-my::PSpawner::PSpawner(const std::string path, const std::string pname,
+my::PSpawner::PSpawner(const std::string path,
                        const std::vector<std::string> argv,
                        const std::vector<std::string> envp) {
   spawner = new PSpawnerImpl;
   spawner->pid = 0;
   spawner->path = path;
-  spawner->pname = pname;
   spawner->argv = argv;
-  spawner->argv.insert(spawner->argv.begin(), spawner->pname);
+  spawner->argv.insert(spawner->argv.begin(), spawner->path);
   spawner->argv.push_back("\0");
   spawner->envp = envp;
   spawner->envp.push_back("\0");
@@ -36,6 +49,8 @@ my::PSpawner::PSpawner(const std::string path, const std::string pname,
 }
 
 my::PSpawner::~PSpawner() { delete spawner; }
+
+// #ifndef WIN32
 
 char **to_c_style_str_list(const std::vector<std::string> &v) {
   char **res = new char *[v.size()];
@@ -48,20 +63,50 @@ char **to_c_style_str_list(const std::vector<std::string> &v) {
 
 void free_c_style_str_list(char ***list, size_t n) {
   for (auto i = 0; i < n; ++i) {
-    delete (*list)[i];
+    delete[] (*list)[i];
   }
-  delete *list;
+  delete[] *list;
 }
+
+// #endif
 
 // TODO: add exception for any error
 void my::PSpawner::start() {
-  char **argv = to_c_style_str_list(get_argv());
   char **envp = to_c_style_str_list(get_envp());
+  
+#ifdef WIN32
+
+  std::stringstream strstream;
+  for (size_t i = 0; i < get_argv().size() - 1; ++i) {
+    strstream << get_argv()[i] << ' ';
+  }
+  strstream << get_argv()[get_argv().size() - 1];
+
+  auto str = strstream.str();
+  char *argv = new char[str.size() + 1];
+  strcpy(argv, str.c_str());
+
+  STARTUPINFO si;
+  PROCESS_INFORMATION pi;
+
+  CreateProcess(NULL, argv, NULL, NULL, FALSE, 0, envp, NULL, &si, &pi);
+
+  spawner->h_process = pi.hProcess;
+  spawner->pid = pi.dwProcessId;
+
+  delete[] argv;
+
+#else
+
+  char **argv = to_c_style_str_list(get_argv());
 
   auto status = posix_spawn(&this->spawner->pid, get_path().c_str(), NULL, NULL,
                             argv, envp);
 
   free_c_style_str_list(&argv, get_argv().size());
+
+#endif
+
   free_c_style_str_list(&envp, get_envp().size());
 }
 
@@ -82,9 +127,7 @@ int my::PSpawner::wait() {
   return status;
 }
 
-void my::PSpawner::kill() {
-  ::kill(spawner->pid, SIGTERM);
-}
+void my::PSpawner::kill() { ::kill(spawner->pid, SIGTERM); }
 
 int my::PSpawner::get_pid() const noexcept { return spawner->pid; }
 
