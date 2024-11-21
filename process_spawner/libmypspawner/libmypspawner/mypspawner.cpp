@@ -5,20 +5,16 @@
 #include <cstring>
 
 #ifdef WIN32
-
 #include <sstream>
 #include <windows.h>
-
 #else
-
 #include <spawn.h>
 #include <sys/wait.h>
-
 #endif
 
 class my::PSpawner::PSpawnerImpl {
 public:
-  int pid;
+  my::PSpawner::pid_t pid;
 
   std::string path;
 
@@ -29,9 +25,7 @@ public:
   bool is_running;
 
 #ifdef WIN32
-
   HANDLE h_process;
-
 #endif
 };
 
@@ -68,11 +62,10 @@ void free_c_style_str_list(char ***list, size_t n) {
 }
 
 // TODO: add exception for any error
-void my::PSpawner::start() {
+my::PSpawner::pid_t my::PSpawner::start() {
   char **envp = to_c_style_str_list(get_envp());
 
 #ifdef WIN32
-
   std::stringstream strstream;
   for (size_t i = 0; i < get_argv().size() - 1; ++i) {
     strstream << get_argv()[i] << ' ';
@@ -92,27 +85,26 @@ void my::PSpawner::start() {
   spawner->pid = pi.dwProcessId;
 
   delete[] argv;
-
 #else
-
   char **argv = to_c_style_str_list(get_argv());
 
   auto status = posix_spawn(&this->spawner->pid, get_path().c_str(), NULL, NULL,
                             argv, envp);
 
   free_c_style_str_list(&argv, get_argv().size());
-
 #endif
 
   free_c_style_str_list(&envp, get_envp().size());
+
+  return spawner->pid;
 }
 
 bool my::PSpawner::is_running() {
 #ifdef WIN32
-  DWORD res;
+  retunr_code_t res;
   GetExitCodeProcess(spawner->h_process, &res);
 #else
-  auto res = ::kill(spawner->pid, 0);
+  return_code_t res = ::kill(spawner->pid, 0);
 #endif
 
 #ifdef WIN32
@@ -124,38 +116,36 @@ bool my::PSpawner::is_running() {
   } else {
     spawner->is_running = false;
   }
+
   return spawner->is_running;
 }
 
 // TODO: add exception for any error
-int my::PSpawner::wait() {
+my::PSpawner::return_code_t my::PSpawner::wait() {
 #ifdef WIN32
-
   WaitForSingleObject(spawner->h_process, INFINITE);
 
-  DWORD res;
-  GetExitCodeProcess(spawner->h_process, &res);
-  
-  return res;
-  
+  return_code_t status;
+  GetExitCodeProcess(spawner->h_process, &status);
 #else
-
-  int status;
+  return_code_t status;
   int res = waitpid(spawner->pid, &status, 0);
-  return status;
-  
 #endif
+
+  return status;
 }
 
-void my::PSpawner::kill() { 
+void my::PSpawner::kill() {
 #ifdef WIN32
   TerminateProcess(spawner->h_process, 1);
 #else
-  ::kill(spawner->pid, SIGTERM); 
+  ::kill(spawner->pid, SIGTERM);
 #endif
 }
 
-int my::PSpawner::get_pid() const noexcept { return spawner->pid; }
+my::PSpawner::pid_t my::PSpawner::get_pid() const noexcept {
+  return spawner->pid;
+}
 
 const std::string &my::PSpawner::get_path() const noexcept {
   return spawner->path;

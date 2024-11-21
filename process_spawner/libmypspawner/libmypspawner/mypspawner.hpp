@@ -12,15 +12,27 @@ public:
 
   ~PSpawner();
 
-  void start();
+#ifdef WIN32
+
+  typedef unsigned long pid_t;
+  typedef unsigned long return_code_t;
+
+#else
+
+  typedef int pid_t;
+  typedef int return_code_t;
+
+#endif
+
+  pid_t start();
 
   bool is_running();
 
-  int wait();
+  return_code_t wait();
 
   void kill();
 
-  int get_pid() const noexcept;
+  pid_t get_pid() const noexcept;
 
   const std::string &get_path() const noexcept;
 
