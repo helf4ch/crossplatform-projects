@@ -1,8 +1,10 @@
 #include "mypspawner.hpp"
 
+#include <cerrno>
 #include <csignal>
 #include <cstddef>
 #include <cstring>
+#include <string>
 
 #ifdef WIN32
 #include <sstream>
@@ -88,8 +90,12 @@ my::PSpawner::pid_t my::PSpawner::start() {
 #else
   char **argv = to_c_style_str_list(get_argv());
 
-  auto status = posix_spawn(&this->spawner->pid, get_path().c_str(), NULL, NULL,
-                            argv, envp);
+  int result = posix_spawn(&this->spawner->pid, get_path().c_str(), NULL, NULL,
+                           argv, envp);
+
+  if (result) {
+    throw Exception("Error in PSpawner::start.", errno);
+  }
 
   free_c_style_str_list(&argv, get_argv().size());
 #endif
@@ -104,18 +110,14 @@ bool my::PSpawner::is_running() {
   retunr_code_t res;
   GetExitCodeProcess(spawner->h_process, &res);
 #else
-  return_code_t res = ::kill(spawner->pid, 0);
-#endif
+  return_code_t result = ::kill(spawner->pid, 0);
 
-#ifdef WIN32
-  if (res == STILL_ACTIVE) {
-#else
-  if (!res) {
-#endif
-    spawner->is_running = true;
-  } else {
+  if (!result && errno == ESRCH) {
     spawner->is_running = false;
+  } else {
+    spawner->is_running = true;
   }
+#endif
 
   return spawner->is_running;
 }
@@ -129,7 +131,11 @@ my::PSpawner::return_code_t my::PSpawner::wait() {
   GetExitCodeProcess(spawner->h_process, &status);
 #else
   return_code_t status;
-  int res = waitpid(spawner->pid, &status, 0);
+  int result = waitpid(spawner->pid, &status, 0);
+  
+  if (result != spawner->pid) {
+    throw Exception("Error in PSpawner::wait.", errno);
+  }
 #endif
 
   return status;
@@ -139,7 +145,11 @@ void my::PSpawner::kill() {
 #ifdef WIN32
   TerminateProcess(spawner->h_process, 1);
 #else
-  ::kill(spawner->pid, SIGTERM);
+  int result = ::kill(spawner->pid, SIGTERM);
+
+  if (!result && errno == EPERM) {
+    throw Exception("Error in PSpawner::kill.", errno);
+  }
 #endif
 }
 
