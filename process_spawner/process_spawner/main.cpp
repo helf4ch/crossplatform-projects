@@ -18,6 +18,7 @@ int main(int argc, char **argv) {
   std::vector<std::string> args_list(argv + 1, argv + argc);
 
   std::string opt_filepath = args_list[0];
+  // std::string opt_filepath = "C:\\Users\\kiril\\projects\\crossplatform-projects\\process_spawner\\files\\repeat_hello.exe";
 
   std::vector<std::string> opt_argv = {};
   std::vector<std::string> opt_envp = {};
