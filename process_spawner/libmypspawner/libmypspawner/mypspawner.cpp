@@ -42,7 +42,12 @@ my::PSpawner::PSpawner(const std::string path,
   spawner->is_running = false;
 }
 
-my::PSpawner::~PSpawner() { delete spawner; }
+my::PSpawner::~PSpawner() { 
+#ifdef _WIN32
+  CloseHandle(spawner->h_process);
+#endif
+  delete spawner; 
+}
 
 #ifndef _WIN32
 char **to_c_style_str_list(const std::vector<std::string> &v) {

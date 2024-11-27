@@ -13,7 +13,7 @@ public:
 
   ~PSpawner();
 
-#ifdef WIN32
+#ifdef _WIN32
 
   typedef unsigned long pid_t;
   typedef unsigned long return_code_t;
