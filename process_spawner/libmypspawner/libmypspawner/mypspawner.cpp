@@ -39,11 +39,6 @@ my::PSpawner::PSpawner(const std::string path,
   spawner->path = path;
   spawner->argv = argv;
   spawner->envp = envp;
-#ifndef _WIN32
-  spawner->argv.insert(spawner->argv.begin(), spawner->path);
-  spawner->argv.push_back("\0");
-  spawner->envp.push_back("\0");
-#endif
   spawner->is_running = false;
 }
 
@@ -51,18 +46,26 @@ my::PSpawner::~PSpawner() { delete spawner; }
 
 #ifndef _WIN32
 char **to_c_style_str_list(const std::vector<std::string> &v) {
-  char **res = new char *[v.size()];
+  size_t size = v.size() + 1;
+  char **res = new char *[size];
+
   for (auto i = 0; i < v.size(); ++i) {
-    res[i] = new char[v[i].size() + 1];
+    res[i] = new char[v[i].size()];
     strcpy(res[i], v[i].c_str());
   }
+
+  res[size - 1] = NULL;
+
   return res;
 }
 
-void free_c_style_str_list(char ***list, size_t n) {
-  for (auto i = 0; i < n; ++i) {
-    delete[] (*list)[i];
+void free_c_style_str_list(char ***list) {
+  char **ptr = *list;
+
+  for (; *ptr; ++ptr) {
+    delete[] *ptr;
   }
+
   delete[] *list;
 }
 #endif
@@ -118,9 +121,16 @@ my::PSpawner::pid_t my::PSpawner::start() {
 
   delete[] envp_str;
 #else
-  std::cout << "jopa";
-  char **argv = to_c_style_str_list(get_argv());
-  char **envp = to_c_style_str_list(get_envp());
+  std::vector<std::string> argv_v = get_argv();
+  argv_v.insert(argv_v.begin(), get_path());
+  // argv_v.push_back("\0");
+
+  char **argv = to_c_style_str_list(argv_v);
+
+  std::vector<std::string> envp_v = get_argv();
+  // envp_v.push_back("\0");
+
+  char **envp = to_c_style_str_list(envp_v);
 
   int result = posix_spawn(&this->spawner->pid, get_path().c_str(), NULL, NULL,
                            argv, envp);
@@ -129,8 +139,8 @@ my::PSpawner::pid_t my::PSpawner::start() {
     throw Exception("Error in PSpawner::start.", errno);
   }
 
-  free_c_style_str_list(&argv, get_argv().size());
-  free_c_style_str_list(&envp, get_envp().size());
+  free_c_style_str_list(&argv);
+  free_c_style_str_list(&envp);
 #endif
 
   return spawner->pid;
