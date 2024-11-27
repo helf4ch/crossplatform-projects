@@ -123,13 +123,9 @@ my::PSpawner::pid_t my::PSpawner::start() {
 #else
   std::vector<std::string> argv_v = get_argv();
   argv_v.insert(argv_v.begin(), get_path());
-  // argv_v.push_back("\0");
-
   char **argv = to_c_style_str_list(argv_v);
 
   std::vector<std::string> envp_v = get_argv();
-  // envp_v.push_back("\0");
-
   char **envp = to_c_style_str_list(envp_v);
 
   int result = posix_spawn(&this->spawner->pid, get_path().c_str(), NULL, NULL,
@@ -163,7 +159,9 @@ bool my::PSpawner::is_running() {
 #else
   return_code_t result = ::kill(spawner->pid, 0);
 
-  if (!result && errno == ESRCH) {
+  if (result == -1 && errno != ESRCH) {
+    spawner->is_running = true;
+  } else if (result == -1) {
     spawner->is_running = false;
   } else {
     spawner->is_running = true;
