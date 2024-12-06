@@ -210,7 +210,7 @@ void my::PSpawner::kill() {
 #endif
 }
 
-my::PSpawner::pid_t my::PSpawner::get_pid() const noexcept {
+const my::PSpawner::pid_t my::PSpawner::get_pid() const noexcept {
   return spawner->pid;
 }
 

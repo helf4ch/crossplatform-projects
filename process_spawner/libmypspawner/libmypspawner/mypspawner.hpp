@@ -50,7 +50,7 @@ public:
 
   void kill();
 
-  pid_t get_pid() const noexcept;
+  const pid_t get_pid() const noexcept;
 
   const std::string &get_path() const noexcept;
 
@@ -60,6 +60,7 @@ public:
 
 private:
   class PSpawnerImpl;
+
   PSpawnerImpl *spawner;
 };
 
