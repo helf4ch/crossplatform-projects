@@ -1,1 +1,1 @@
-add_library(${PROJECT_NAME} myshm.cpp)
+add_library(${PROJECT_NAME} myshm.hpp)
