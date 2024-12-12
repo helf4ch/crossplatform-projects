@@ -9,6 +9,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#define MY_SHAREDMEMORY_NAME_PREPEND "my-sharedmemory-"
+
 struct ShmHeader {
   uint32_t use_count;
 };
@@ -29,14 +31,14 @@ template <typename T>
 my::SharedMemory<T>::SharedMemory(const std::string &name, size_t size) {
   shm = new ShmImpl<T>;
 
-  shm->name = name;
+  shm->name = MY_SHAREDMEMORY_NAME_PREPEND + name;
 
   // FIX: error generation
   // int is_err = shm_open(name.c_str(), O_CREAT | O_EXCL, 0777);
   // bool is_exist = is_err == -1 && errno == EEXIST ? true : false;
 
   // FIX: error generation
-  int shm_d = shm_open(name.c_str(), O_CREAT | O_RDWR, 0777);
+  int shm_d = shm_open(shm->name.c_str(), O_CREAT | O_RDWR, 0777);
 
   shm->block_size = size + sizeof(ShmHeader);
   // FIX: error generation

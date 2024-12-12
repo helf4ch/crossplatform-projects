@@ -11,7 +11,7 @@ struct Test {
 void myfunc1(my::SharedMemory<Test> *shm, my::Semaphore *sem) {
   std::cout << "func1 " << (*shm)->num << '\n';
   sem->post();
-  sleep(1);
+  sleep(20);
   sem->wait();
   std::cout << "func1 " << (*shm)->num << '\n';
 }
@@ -23,8 +23,8 @@ void myfunc2(my::SharedMemory<Test> *shm, my::Semaphore *sem) {
 }
 
 int main(int argc, char **argv) {
-  my::SharedMemory<Test> shm("name1");
-  my::Semaphore sem("name9");
+  my::SharedMemory<Test> shm("myshm");
+  my::Semaphore sem("mysema");
 
   std::thread f1(myfunc1, &shm, &sem);
   std::thread f2(myfunc2, &shm, &sem);
