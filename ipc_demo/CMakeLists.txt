@@ -19,5 +19,5 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang|GNU")
 endif()
 
 add_subdirectory(libmyshm/)
-add_subdirectory(libmythread/)
+add_subdirectory(libmysem/)
 add_subdirectory(${PROJECT_NAME}/)
