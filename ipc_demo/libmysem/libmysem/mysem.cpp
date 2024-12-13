@@ -43,7 +43,7 @@ my::Semaphore::~Semaphore() {
   delete sem;
 }
 
-void my::Semaphore::post() {
+void my::Semaphore::post() const {
   int result = sem_post(sem->sem_p);
   if (result) {
     // TODO: error
@@ -51,7 +51,7 @@ void my::Semaphore::post() {
   }
 }
 
-void my::Semaphore::wait() {
+void my::Semaphore::wait() const {
   int result = sem_wait(sem->sem_p);
   if (result) {
     // TODO: error

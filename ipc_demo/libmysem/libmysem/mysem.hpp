@@ -6,13 +6,13 @@ namespace my {
 
 class Semaphore {
 public:
-  Semaphore(const std::string &name);
+  Semaphore(const std::string &name = "");
 
   ~Semaphore();
 
-  void post();
+  void post() const;
 
-  void wait();
+  void wait() const;
   
 private:
   class SemImpl;
