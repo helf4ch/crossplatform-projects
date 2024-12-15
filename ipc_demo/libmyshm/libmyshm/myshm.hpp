@@ -12,8 +12,6 @@ public:
 
   ~SharedMemory();
 
-  void resize();
-
   void *getRaw() const noexcept;  
 
   T *getTyped() const noexcept;  

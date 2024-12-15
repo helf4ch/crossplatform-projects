@@ -1,6 +1,7 @@
 #pragma once 
 
 #include "myshm.hpp"
+#include "libmycommon/mycommon.hpp"
 #include <cerrno>
 #include <cstddef>
 #include <cstdint>
@@ -33,21 +34,23 @@ my::SharedMemory<T>::SharedMemory(const std::string &name, size_t size) {
 
   shm->name = MY_SHAREDMEMORY_NAME_PREPEND + name;
 
-  // FIX: error generation
-  // int is_err = shm_open(name.c_str(), O_CREAT | O_EXCL, 0777);
-  // bool is_exist = is_err == -1 && errno == EEXIST ? true : false;
-
-  // FIX: error generation
   int shm_d = shm_open(shm->name.c_str(), O_CREAT | O_RDWR, 0777);
+  if (shm_d == -1) {
+    throw my::common::Exception("Error in my::SharedMemory::SharedMemory (shm_open).", errno);
+  }
 
   shm->block_size = size + sizeof(ShmHeader);
-  // FIX: error generation
-  ftruncate(shm_d, shm->block_size);
+  int ftrunc_res = ftruncate(shm_d, shm->block_size);
+  if (ftrunc_res == -1) {
+    throw my::common::Exception("Error in my::SharedMemory::SharedMemory (ftruncate).", errno);
+  }
   
-  // FIX: error generation
   shm->addr =
       mmap(NULL, shm->block_size, PROT_EXEC | PROT_READ | PROT_WRITE,
            MAP_SHARED, shm_d, 0);
+  if (shm->addr == (void *)-1) {
+    throw my::common::Exception("Error in my::SharedMemory::SharedMemory (mmap).", errno);
+  }
 
   close(shm_d);
 
@@ -60,11 +63,9 @@ my::SharedMemory<T>::SharedMemory(const std::string &name, size_t size) {
 }
 
 template <typename T> my::SharedMemory<T>::~SharedMemory() { 
-  // FIX: error generation
   shm->header_p->use_count -= 1;
 
   if (shm->header_p->use_count == 0) {
-  // FIX: error generation
     munmap(shm->addr, shm->block_size);
     shm_unlink(shm->name.c_str());
   } else {
