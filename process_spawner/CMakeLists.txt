@@ -18,5 +18,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang|GNU")
   )
 endif()
 
+add_subdirectory(libmycommon/)
 add_subdirectory(libmypspawner/)
 add_subdirectory(${PROJECT_NAME}/)
