@@ -35,11 +35,16 @@ void increase_300ms(const my::SharedMemory<Data> &shm,
                     const my::Semaphore &sem) {
   bool is_exit = false;
   while (!is_exit) {
-    sem.wait();
-    shm->counter += 1;
-    is_exit = shm->exit_flag;
-    sem.post();
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    try {
+      sem.wait();
+      shm->counter += 1;
+      is_exit = shm->exit_flag;
+      sem.post();
+      std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    } catch (std::exception &e) {
+      std::cerr << e.what();
+      is_exit = true;
+    }
   }
 }
 
@@ -47,18 +52,21 @@ void write_1s(const my::SharedMemory<Data> &shm, const my::Semaphore &sem,
               std::fstream &file) {
   bool is_exit = false;
   while (!is_exit) {
-    sem.wait();
-    file << "[" << get_ctime_string() << "] " << get_current_pid() << ": "
-         << shm->counter << '\n';
-    is_exit = shm->exit_flag;
-    sem.post();
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    try {
+      sem.wait();
+      file << "[" << get_ctime_string() << "] " << get_current_pid() << ": "
+           << shm->counter << '\n';
+      is_exit = shm->exit_flag;
+      sem.post();
+      std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    } catch (std::exception &e) {
+      std::cerr << e.what();
+      is_exit = true;
+    }
   }
 }
 
 int main(int argc, char **argv) {
-  std::signal(SIGINT, signalHandler);
-
   std::fstream log("log.txt", std::fstream::out);
 
   my::SharedMemory<Data> shm("myshm");
@@ -77,6 +85,13 @@ int main(int argc, char **argv) {
   std::cout << "Commands: set; get; exit.\n";
 
   std::string input;
+
+  std::signal(SIGABRT, signalHandler);
+  std::signal(SIGFPE, signalHandler);
+  std::signal(SIGILL, signalHandler);
+  std::signal(SIGINT, signalHandler);
+  std::signal(SIGSEGV, signalHandler);
+  std::signal(SIGTERM, signalHandler);
 
   int err = setjmp(env);
 
