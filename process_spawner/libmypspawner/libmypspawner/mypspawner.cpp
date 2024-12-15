@@ -118,7 +118,7 @@ my::common::pid_t my::PSpawner::start() {
                     NULL, NULL, FALSE, 0, envp_str, NULL, &si, &pi);
 
   if (!result) {
-    throw my::common::Exception("Error in PSpawner::start.", GetLastError());
+    throw my::common::Exception("Error in my::PSpawner::start.", GetLastError());
   }
 
   spawner->h_process = pi.hProcess;
@@ -137,7 +137,7 @@ my::common::pid_t my::PSpawner::start() {
                            argv, envp);
 
   if (result) {
-    throw my::common::Exception("Error in PSpawner::start.", errno);
+    throw my::common::Exception("Error in my::PSpawner::start.", errno);
   }
 
   free_c_style_str_list(&argv);
@@ -153,7 +153,7 @@ bool my::PSpawner::is_running() {
   int result = GetExitCodeProcess(spawner->h_process, &status);
 
   if (!result) {
-    throw my::common::Exception("Error in PSpawner::is_running.", GetLastError());
+    throw my::common::Exception("Error in my::PSpawner::is_running.", GetLastError());
   }
 
   if (status == STILL_ACTIVE) {
@@ -184,14 +184,14 @@ my::common::return_code_t my::PSpawner::wait() {
   int result = GetExitCodeProcess(spawner->h_process, &status);
 
   if (result && GetLastError() != ERROR_SUCCESS) {
-    throw my::common::Exception("Error in PSpawner::wait.", GetLastError());
+    throw my::common::Exception("Error in my::PSpawner::wait.", GetLastError());
   }
 #else
   my::common::return_code_t status;
   int result = waitpid(spawner->pid, &status, 0);
 
   if (result != spawner->pid) {
-    throw my::common::Exception("Error in PSpawner::wait.", errno);
+    throw my::common::Exception("Error in my::PSpawner::wait.", errno);
   }
 #endif
 
@@ -205,7 +205,7 @@ void my::PSpawner::kill() {
   int result = ::kill(spawner->pid, SIGTERM);
 
   if (!result && errno == EPERM) {
-    throw my::common::Exception("Error in PSpawner::kill.", errno);
+    throw my::common::Exception("Error in my::PSpawner::kill.", errno);
   }
 #endif
 }
