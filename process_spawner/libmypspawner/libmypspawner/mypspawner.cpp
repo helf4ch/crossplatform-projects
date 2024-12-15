@@ -1,7 +1,5 @@
 #include "mypspawner.hpp"
 
-#include "libmycommon/mycommon.hpp"
-
 #include <cerrno>
 #include <csignal>
 #include <cstddef>
@@ -18,7 +16,7 @@
 
 class my::PSpawner::PSpawnerImpl {
 public:
-  my::PSpawner::pid_t pid;
+  my::common::pid_t pid;
 
   std::string path;
 
@@ -77,7 +75,7 @@ void free_c_style_str_list(char ***list) {
 }
 #endif
 
-my::PSpawner::pid_t my::PSpawner::start() {
+my::common::pid_t my::PSpawner::start() {
 #ifdef _WIN32
   std::stringstream argv_strstream;
   for (size_t i = 0; i < get_argv().size(); ++i) {
@@ -151,7 +149,7 @@ my::PSpawner::pid_t my::PSpawner::start() {
 
 bool my::PSpawner::is_running() {
 #ifdef _WIN32
-  return_code_t status;
+  my::common::return_code_t status;
   int result = GetExitCodeProcess(spawner->h_process, &status);
 
   if (!result) {
@@ -164,7 +162,7 @@ bool my::PSpawner::is_running() {
     spawner->is_running = false;
   }
 #else
-  return_code_t result = ::kill(spawner->pid, 0);
+  my::common::return_code_t result = ::kill(spawner->pid, 0);
 
   if (result == -1 && errno != ESRCH) {
     spawner->is_running = true;
@@ -178,18 +176,18 @@ bool my::PSpawner::is_running() {
   return spawner->is_running;
 }
 
-my::PSpawner::return_code_t my::PSpawner::wait() {
+my::common::return_code_t my::PSpawner::wait() {
 #ifdef _WIN32
   WaitForSingleObject(spawner->h_process, INFINITE);
 
-  return_code_t status;
+  my::common::return_code_t status;
   int result = GetExitCodeProcess(spawner->h_process, &status);
 
   if (result && GetLastError() != ERROR_SUCCESS) {
     throw my::common::Exception("Error in PSpawner::wait.", GetLastError());
   }
 #else
-  return_code_t status;
+  my::common::return_code_t status;
   int result = waitpid(spawner->pid, &status, 0);
 
   if (result != spawner->pid) {
@@ -212,7 +210,7 @@ void my::PSpawner::kill() {
 #endif
 }
 
-const my::PSpawner::pid_t my::PSpawner::get_pid() const noexcept {
+const my::common::pid_t my::PSpawner::get_pid() const noexcept {
   return spawner->pid;
 }
 
