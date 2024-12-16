@@ -1,16 +1,18 @@
 #include "libmysem/mysem.hpp"
 #include "libmyshm/myshm.hpp"
 #include <algorithm>
+#include <chrono>
 #include <csetjmp>
 #include <csignal>
-#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <exception>
+#include <fstream>
+#include <future>
 #include <iomanip>
 #include <iostream>
-#include <memory>
 #include <sstream>
+#include <string>
 #include <sys/types.h>
 #include <thread>
 #include <unistd.h>
@@ -24,127 +26,24 @@ int get_current_pid() { return getpid(); }
 
 std::string get_ctime_string() {
   std::stringstream buffer;
-  std::time_t t = std::time(0); // get time now
+  std::time_t t = std::time(0);
   std::tm *now = std::localtime(&t);
   buffer << std::put_time(now, "%d.%m.%Y %H:%M:%S");
   return buffer.str();
 }
 
-class IPLog {
-public:
-  IPLog(const std::string &file_name) {
-    sem = std::make_unique<my::Semaphore>(file_name);
-    sem->wait();
-
-    shm_buf = std::make_unique<my::SharedMemory<buf>>(file_name);
-
-    if ((*shm_buf)->use_count == 0) {
-      is_file_owner = true;
-      is_continue_handling = true;
-      file = fopen(file_name.c_str(), "w+");
-    }
-
-    (*shm_buf)->use_count += 1;
-
-    sem->post();
-  }
-
-  ~IPLog() {
-    if (is_file_owner) {
-      fclose(file);
-    }
-  }
-
-  void write() {
-    lock();
-    std::cout << str_stream.str();
-
-    strcpy(get_shm()->msg, str_stream.str().c_str());
-    get_shm()->msg_count += 1;
-
-    str_stream.str("");
-
-    unlock();
-  }
-
-  void start_handling() {
-    if (!is_file_owner) {
-      return;
-    }
-
-    handle_thread = std::thread(&IPLog::handling, this);
-  }
-
-  void stop_handling() {
-    if (!is_file_owner) {
-      return;
-    }
-
-    is_continue_handling = false;
-    handle_thread.join();
-  }
-
-  friend std::stringstream &operator<<(IPLog &obj,
-                                       const std::string &str);
-
-private:
-  const static uint32_t BUF_SIZE = 255;
-
-  struct buf {
-    int use_count;
-    int msg_count;
-    char msg[BUF_SIZE];
-  };
-
-  std::unique_ptr<my::Semaphore> sem;
-  std::unique_ptr<my::SharedMemory<buf>> shm_buf;
-
-  bool is_file_owner = false;
-  FILE *file = NULL;
-
-  std::stringstream str_stream;
-
-  bool is_continue_handling;
-  std::thread handle_thread;
-
-  const my::SharedMemory<buf> &get_shm() { return *shm_buf; }
-
-  const my::Semaphore &get_sem() { return *sem; }
-
-  void lock() { get_sem().wait(); }
-
-  void unlock() { get_sem().post(); }
-
-  void handling() {
-    while (is_continue_handling) {
-      if (get_shm()->msg_count > 0) {
-        fprintf(file, "%s", get_shm()->msg);
-        get_shm()->msg_count -= 1;
-      }
-    }
-  }
-};
-
-std::stringstream &operator<<(IPLog &obj, const std::string &str) {
-  obj.str_stream << str;
-  return obj.str_stream;
-}
-
 struct Data {
   bool exit_flag;
+  int use_count;
   int counter;
 };
 
-void increase_300ms(const my::SharedMemory<Data> &shm,
-                    const my::Semaphore &sem) {
-  bool is_exit = false;
+void increase_300ms(const my::SharedMemory<Data> &shm, const my::Semaphore &sem,
+                    bool &is_exit) {
   while (!is_exit) {
     try {
       sem.wait();
-
       shm->counter += 1;
-      is_exit = shm->exit_flag;
-
       sem.post();
 
       std::this_thread::sleep_for(std::chrono::milliseconds(300));
@@ -156,17 +55,13 @@ void increase_300ms(const my::SharedMemory<Data> &shm,
 }
 
 void write_1s(const my::SharedMemory<Data> &shm, const my::Semaphore &sem,
-              IPLog &log) {
-  bool is_exit = false;
+              std::fstream &log, bool &is_exit) {
   while (!is_exit) {
     try {
       sem.wait();
 
-      log << "[" << get_ctime_string() << "] PID " << get_current_pid() << " posted "
-           << shm->counter << '\n';
-      log.write();
-
-      is_exit = shm->exit_flag;
+      log << "[" << get_ctime_string() << "] PID " << get_current_pid()
+          << " posted " << shm->counter << '\n';
 
       sem.post();
 
@@ -179,22 +74,29 @@ void write_1s(const my::SharedMemory<Data> &shm, const my::Semaphore &sem,
 }
 
 int main(int argc, char **argv) {
-  IPLog log("log.txt");
-
+  std::fstream log("log.txt", std::fstream::out);
   my::SharedMemory<Data> shm("myshm");
-
   my::Semaphore sem("mysem");
-
-  log.start_handling();
 
   log << "[" << get_ctime_string() << "] started in PID " << get_current_pid()
       << '\n';
 
-  log.write();
+  sem.wait();
+  bool is_main_process = false;
+  if (shm->use_count == 0) {
+    is_main_process = true;
+  }
+  shm->use_count += 1;
+  sem.post();
 
-  std::thread th_increase_300ms(increase_300ms, std::cref(shm), std::cref(sem));
-  std::thread th_write_1s(write_1s, std::cref(shm), std::cref(sem),
-                          std::ref(log));
+  bool is_exit = false;
+  std::thread th_increase_300ms(increase_300ms, std::cref(shm), std::cref(sem),
+                                std::ref(is_exit));
+  std::thread th_write_1s;
+  if (is_main_process) {
+    th_write_1s = std::thread(write_1s, std::cref(shm), std::cref(sem),
+                              std::ref(log), std::ref(is_exit));
+  }
 
   std::cout << "Commands: set; get; exit.\n";
 
@@ -209,7 +111,24 @@ int main(int argc, char **argv) {
 
   int err = setjmp(env);
 
-  while (getline(std::cin, input) && !err) {
+  while (!err) {
+    auto task =
+        std::async(std::launch::async, [&] { std::getline(std::cin, input); });
+
+    while (!shm->exit_flag) {
+      std::future_status result =
+          task.wait_for(std::chrono::milliseconds(1000));
+      if (result == std::future_status::ready) {
+        break;
+      }
+    }
+
+    if (shm->exit_flag) {
+      is_exit = true;
+      std::cout << "Root called to exit, press enter to proceed.\n";
+      break;
+    }
+
     std::vector<std::string> str_splitted;
 
     std::string::iterator it;
@@ -221,7 +140,6 @@ int main(int argc, char **argv) {
 
     if (str_splitted[0] == "get") {
       sem.wait();
-      std::cout << "exit is " << shm->exit_flag << '\n';
       std::cout << "Counter is: " << shm->counter << '\n';
       sem.post();
     } else if (str_splitted[0] == "exit") {
@@ -245,16 +163,22 @@ int main(int argc, char **argv) {
 
   std::cout << "Exiting...\n";
 
+  is_exit = true;
+
   sem.wait();
-  shm->exit_flag = true;
+  if (is_main_process) {
+    shm->exit_flag = true;
+  }
+  shm->use_count -= 1;
   sem.post();
 
   th_increase_300ms.join();
-  th_write_1s.join();
+
+  if (is_main_process) {
+    th_write_1s.join();
+  }
 
   std::cout << "Exited.\n";
-
-  log.stop_handling();
 
   return 0;
 }
