@@ -54,7 +54,7 @@ void write_1s(const my::SharedMemory<Data> &shm, const my::Semaphore &sem,
   while (!is_exit) {
     try {
       sem.wait();
-      file << "[" << get_ctime_string() << "] " << get_current_pid() << ": "
+      file << "[" << get_ctime_string() << "] PID " << get_current_pid() << ": "
            << shm->counter << '\n';
       is_exit = shm->exit_flag;
       sem.post();
@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
 
   my::Semaphore sem("mysem");
 
-  log << "[" << get_ctime_string() << "] started in: " << get_current_pid()
+  log << "[" << get_ctime_string() << "] started in PID " << get_current_pid()
       << '\n';
 
   sem.post();
