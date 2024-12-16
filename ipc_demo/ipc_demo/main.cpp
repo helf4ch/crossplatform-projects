@@ -76,8 +76,6 @@ int main(int argc, char **argv) {
   log << "[" << get_ctime_string() << "] started in PID " << get_current_pid()
       << '\n';
 
-  sem.post();
-
   std::thread th_increase_300ms(increase_300ms, std::cref(shm), std::cref(sem));
   std::thread th_write_1s(write_1s, std::cref(shm), std::cref(sem),
                           std::ref(log));
