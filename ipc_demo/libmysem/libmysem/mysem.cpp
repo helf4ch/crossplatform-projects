@@ -26,7 +26,7 @@ public:
   sem_t *sem_p;
 #endif
   std::string sem_name;
-  std::unique_ptr<my::SharedMemory<int>> sem_counter;
+  std::unique_ptr<my::SharedMemory<int>> sem_use_counter;
 };
 
 my::Semaphore::Semaphore(const std::string &name) {
@@ -47,10 +47,10 @@ my::Semaphore::Semaphore(const std::string &name) {
   }
   post();
   
-  sem->sem_counter = std::make_unique<my::SharedMemory<int>>(
+  sem->sem_use_counter = std::make_unique<my::SharedMemory<int>>(
       MY_SEMAPHORE_NAME_PREPEND + std::string{"private-obj"});
 
-  *sem->sem_counter->getTyped() += 1;
+  *sem->sem_use_counter->getTyped() += 1;
 #endif
 }
 
@@ -60,8 +60,8 @@ my::Semaphore::~Semaphore() {
 #else
   sem_close(sem->sem_p);
 
-  *sem->sem_counter->getTyped() -= 1;
-  if (*sem->sem_counter->getTyped() == 0) {
+  *sem->sem_use_counter->getTyped() -= 1;
+  if (*sem->sem_use_counter->getTyped() == 0) {
     sem_unlink(sem->sem_name.c_str());
   }
 #endif
