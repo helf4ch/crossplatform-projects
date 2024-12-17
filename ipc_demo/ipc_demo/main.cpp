@@ -8,7 +8,6 @@
 #include <cstring>
 #include <exception>
 #include <fstream>
-#include <future>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -20,7 +19,7 @@
 
 jmp_buf env;
 
-void signalHandler(int signum) { longjmp(env, 1); }
+void signalHandler(int signum) { longjmp(env, signum); }
 
 int get_current_pid() { return getpid(); }
 
@@ -30,6 +29,22 @@ std::string get_ctime_string() {
   std::tm *now = std::localtime(&t);
   buffer << std::put_time(now, "%d.%m.%Y %H:%M:%S");
   return buffer.str();
+}
+
+bool getline_nonblocking(std::istream &in, std::string &str) {
+  char ch;
+  int count = in.readsome(&ch, 1);
+
+  bool line_end = false;
+  if (count) {
+    if (ch == '\n') {
+      line_end = true;
+    } else {
+      str.append(1, ch);
+    }
+  }
+
+  return line_end;
 }
 
 struct Data {
@@ -101,6 +116,7 @@ int main(int argc, char **argv) {
   std::cout << "Commands: set; get; exit.\n";
 
   std::string input;
+  std::ios_base::sync_with_stdio(false);
 
   std::signal(SIGABRT, signalHandler);
   std::signal(SIGFPE, signalHandler);
@@ -111,21 +127,24 @@ int main(int argc, char **argv) {
 
   int err = setjmp(env);
 
-  while (!err) {
-    auto task =
-        std::async(std::launch::async, [&] { std::getline(std::cin, input); });
+  if (err) {
+    std::cout << "SIGNAL: " << err << '\n';
+  }
 
-    while (!shm->exit_flag) {
-      std::future_status result =
-          task.wait_for(std::chrono::milliseconds(1000));
-      if (result == std::future_status::ready) {
-        break;
+  while (!err && !is_exit) {
+    input.clear();
+
+    while (!getline_nonblocking(std::cin, input)) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+      if (!shm->exit_flag) {
+        continue;
       }
-    }
 
-    if (shm->exit_flag) {
+      if (!is_main_process) {
+        std::cout << "Root called to exit.\n";
+      }
       is_exit = true;
-      std::cout << "Root called to exit, press enter to proceed.\n";
       break;
     }
 
@@ -147,6 +166,7 @@ int main(int argc, char **argv) {
     } else if (str_splitted[0] == "set") {
       if (str_splitted.size() == 1) {
         std::cout << "Usage: set <number>\n";
+        continue;
       }
       try {
         int num = std::stoi(str_splitted[1]);
@@ -156,7 +176,7 @@ int main(int argc, char **argv) {
       } catch (std::exception &e) {
         std::cout << "Usage: set <number>\n";
       }
-    } else {
+    } else if (input.size() != 0) {
       std::cout << "Commands: set; get; exit.\n";
     }
   }
