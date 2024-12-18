@@ -4,7 +4,6 @@
 #include <chrono>
 #include <csetjmp>
 #include <csignal>
-#include <cstdio>
 #include <cstring>
 #include <exception>
 #include <fstream>
@@ -17,9 +16,11 @@
 #include <unistd.h>
 #include <vector>
 
-jmp_buf env;
+std::jmp_buf env;
 
-void signalHandler(int signum) { longjmp(env, signum); }
+void signalHandler(int signum) { 
+  std::longjmp(env, signum); 
+}
 
 int get_current_pid() { return getpid(); }
 
@@ -31,14 +32,33 @@ std::string get_ctime_string() {
   return buffer.str();
 }
 
+#ifdef _WIN32
+#include <conio.h>
+#include <stdio.h>
+#endif
+
 bool getline_nonblocking(std::istream &in, std::string &str) {
   char ch;
+#ifdef _WIN32
+  char delim = 13;
+
+  int count = 0;
+  if (_kbhit()) {
+    count = 1;
+    ch = _getch();
+    std::cout << ch;
+  }
+#else
+  char delim = 10;
+
   int count = in.readsome(&ch, 1);
+#endif
 
   bool line_end = false;
   if (count) {
-    if (ch == '\n') {
+    if (ch == delim) {
       line_end = true;
+      std::cout << '\n';
     } else {
       str.append(1, ch);
     }
@@ -162,6 +182,8 @@ int main(int argc, char **argv) {
   my::SharedMemory<Data> shm("myshm");
   my::Semaphore sem("mysem");
 
+  std::cout << shm->counter << '\n';
+
   log << "[" << get_ctime_string() << "] started in PID " << get_current_pid()
       << '\n';
 
@@ -196,6 +218,9 @@ int main(int argc, char **argv) {
   std::signal(SIGINT, signalHandler);
   std::signal(SIGSEGV, signalHandler);
   std::signal(SIGTERM, signalHandler);
+#ifdef SIGBREAK
+  std::signal(SIGBREAK, signalHandler);
+#endif
 
   int err = setjmp(env);
 
