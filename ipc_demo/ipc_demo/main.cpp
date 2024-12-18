@@ -95,8 +95,10 @@ void write_1s(const my::SharedMemory<Data> &shm, const my::Semaphore &sem,
     try {
       sem.wait();
 
-      log << "[" << get_ctime_string() << "] " << get_current_pid()
+      std::stringstream ss;
+      ss << "[" << get_ctime_string() << "] " << get_current_pid()
           << " posted " << shm->counter << '\n';
+      log << ss.str();
 
       sem.post();
 
@@ -114,11 +116,18 @@ void first_copy(const my::SharedMemory<Data> &shm, const my::Semaphore &sem,
 
   sem.wait();
 
-  log << "[" << get_ctime_string() << "] first_copy started at "
+  std::stringstream ss;
+  ss << "[" << get_ctime_string() << "] first_copy started at "
       << get_current_pid() << '\n';
+  log << ss.str();
+  
   shm->counter += 10;
-  log << "[" << get_ctime_string() << "] first_copy ended at "
+
+  ss.clear();
+  ss.str("");
+  ss << "[" << get_ctime_string() << "] first_copy ended at "
       << get_current_pid() << '\n';
+  log << ss.str();
 
   sem.post();
 
@@ -130,17 +139,28 @@ void second_copy(const my::SharedMemory<Data> &shm, const my::Semaphore &sem,
   is_second_copy_working = true;
 
   sem.wait();
-  log << "[" << get_ctime_string() << "] second_copy started at "
+  
+  std::stringstream ss;
+  ss << "[" << get_ctime_string() << "] second_copy started at "
       << get_current_pid() << '\n';
+  log << ss.str();
+  
   shm->counter *= 2;
+  
   sem.post();
 
   std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 
   sem.wait();
+  
   shm->counter /= 2;
-  log << "[" << get_ctime_string() << "] second_copy ended at "
+
+  ss.clear();
+  ss.str("");
+  ss << "[" << get_ctime_string() << "] second_copy ended at "
       << get_current_pid() << '\n';
+  log << ss.str();
+  
   sem.post();
 
   is_second_copy_working = false;
@@ -169,7 +189,11 @@ void copy_spawner(const my::SharedMemory<Data> &shm, const my::Semaphore &sem,
       th_second_copy.detach();
     } else {
       sem.wait();
-      log << "[" << get_ctime_string() << "] copys didn't ended, skipping.\n";
+      
+      std::stringstream ss;
+      ss << "[" << get_ctime_string() << "] copys didn't ended, skipping.\n";
+      log << ss.str();
+      
       sem.post();
     }
 
@@ -181,8 +205,6 @@ int main(int argc, char **argv) {
   std::fstream log("log.txt", std::fstream::out);
   my::SharedMemory<Data> shm("myshm");
   my::Semaphore sem("mysem");
-
-  std::cout << shm->counter << '\n';
 
   log << "[" << get_ctime_string() << "] started in PID " << get_current_pid()
       << '\n';
