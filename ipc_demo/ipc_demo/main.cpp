@@ -46,6 +46,11 @@ bool getline_nonblocking(std::istream &in, std::string &str) {
   if (_kbhit()) {
     count = 1;
     ch = _getch();
+    if (ch == 8) {
+      std::cout << char(8) << ' ' << char(8);
+      str.pop_back();
+      return false;
+    }
     std::cout << ch;
   }
 #else
