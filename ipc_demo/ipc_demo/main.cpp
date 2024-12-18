@@ -75,7 +75,7 @@ void write_1s(const my::SharedMemory<Data> &shm, const my::Semaphore &sem,
     try {
       sem.wait();
 
-      log << "[" << get_ctime_string() << "] PID " << get_current_pid()
+      log << "[" << get_ctime_string() << "] " << get_current_pid()
           << " posted " << shm->counter << '\n';
 
       sem.post();
@@ -85,6 +85,75 @@ void write_1s(const my::SharedMemory<Data> &shm, const my::Semaphore &sem,
       std::cerr << e.what();
       is_exit = true;
     }
+  }
+}
+
+void first_copy(const my::SharedMemory<Data> &shm, const my::Semaphore &sem,
+                std::fstream &log, bool &is_first_copy_working) {
+  is_first_copy_working = true;
+
+  sem.wait();
+
+  log << "[" << get_ctime_string() << "] first_copy started at "
+      << get_current_pid() << '\n';
+  shm->counter += 10;
+  log << "[" << get_ctime_string() << "] first_copy ended at "
+      << get_current_pid() << '\n';
+
+  sem.post();
+
+  is_first_copy_working = false;
+}
+
+void second_copy(const my::SharedMemory<Data> &shm, const my::Semaphore &sem,
+                 std::fstream &log, bool &is_second_copy_working) {
+  is_second_copy_working = true;
+
+  sem.wait();
+  log << "[" << get_ctime_string() << "] second_copy started at "
+      << get_current_pid() << '\n';
+  shm->counter *= 2;
+  sem.post();
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+
+  sem.wait();
+  shm->counter /= 2;
+  log << "[" << get_ctime_string() << "] second_copy ended at "
+      << get_current_pid() << '\n';
+  sem.post();
+
+  is_second_copy_working = false;
+}
+
+void copy_spawner(const my::SharedMemory<Data> &shm, const my::Semaphore &sem,
+                  std::fstream &log, bool &is_exit) {
+  bool is_first_copy_working = false;
+  bool is_second_copy_working = false;
+
+  while (!is_exit) {
+    std::thread th_first_copy;
+    std::thread th_second_copy;
+
+    if (!is_first_copy_working && !is_second_copy_working) {
+      th_first_copy =
+          std::thread(first_copy, std::cref(shm), std::cref(sem), std::ref(log),
+                      std::ref(is_first_copy_working));
+      th_first_copy.detach();
+
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+      th_second_copy =
+          std::thread(second_copy, std::cref(shm), std::cref(sem),
+                      std::ref(log), std::ref(is_second_copy_working));
+      th_second_copy.detach();
+    } else {
+      sem.wait();
+      log << "[" << get_ctime_string() << "] copys didn't ended, skipping.\n";
+      sem.post();
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(3000));
   }
 }
 
@@ -108,9 +177,12 @@ int main(int argc, char **argv) {
   std::thread th_increase_300ms(increase_300ms, std::cref(shm), std::cref(sem),
                                 std::ref(is_exit));
   std::thread th_write_1s;
+  std::thread th_copy_spawner;
   if (is_main_process) {
     th_write_1s = std::thread(write_1s, std::cref(shm), std::cref(sem),
                               std::ref(log), std::ref(is_exit));
+    th_copy_spawner = std::thread(copy_spawner, std::cref(shm), std::cref(sem),
+                                  std::ref(log), std::ref(is_exit));
   }
 
   std::cout << "Commands: set; get; exit.\n";
@@ -126,10 +198,6 @@ int main(int argc, char **argv) {
   std::signal(SIGTERM, signalHandler);
 
   int err = setjmp(env);
-
-  if (err) {
-    std::cout << "SIGNAL: " << err << '\n';
-  }
 
   while (!err && !is_exit) {
     input.clear();
@@ -196,6 +264,7 @@ int main(int argc, char **argv) {
 
   if (is_main_process) {
     th_write_1s.join();
+    th_copy_spawner.join();
   }
 
   std::cout << "Exited.\n";
