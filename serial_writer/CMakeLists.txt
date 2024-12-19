@@ -18,5 +18,5 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang|GNU")
   )
 endif()
 
-add_subdirectory(libmyprint/)
+add_subdirectory(json/)
 add_subdirectory(${PROJECT_NAME}/)
