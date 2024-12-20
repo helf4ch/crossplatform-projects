@@ -4,8 +4,9 @@
 // #include <sys/stat.h>
 // #include <fcntl.h>
 
-#include <nlohmann/json.hpp>
+#include "libmyhttp/myhttp.hpp"
 #include <iostream>
+#include <nlohmann/json.hpp>
 
 int main() {
   // auto d = open("/dev/pts/4", O_WRONLY);
@@ -17,19 +18,12 @@ int main() {
   // char buf[] = "hello\n";
   // write(d, buf, 10);
 
-  std::string str = R"(
-    {
-      "temp": {
-        "now": 299.2,
-        "future": 299.3
-      },
-      "feels_like": 262.5
-    }
-  )";
+  using namespace my::http;
+  Request req =
+      Request::gen(Request::request_t::GET, {"127.0.0.1"}, "/some/path", {},
+                   {{"some", "param"}, {"some1", "param1"}});
 
-  nlohmann::json json = nlohmann::json::parse(str);
-
-  std::cout << json["temp"]["future"];
+  std::cout << req.get_str();
 
   return 0;
 }

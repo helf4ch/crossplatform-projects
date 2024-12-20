@@ -1,31 +1,28 @@
 #pragma once
 
-#include <fstream>
+#include <memory>
 #include <netinet/in.h>
 #include <string>
+#include <vector>
 
-namespace my {
+namespace my::http {
 
 class Adress {
 public:
-  enum class adress_t { HOSTNAME, IP };
+  Adress(const std::string &name, int port = 80);
 
-  Adress(const adress_t type, const struct sockaddr_in &addr);
-
-  ~Adress();
+  ~Adress() = default;
 
   const struct sockaddr_in &get_addr() const;
 
-  const adress_t get_type() const;
+  const int get_port() const;
 
-  static Adress get_by_name(const std::string &name, int port = 80);
-
-  static Adress get_by_ip(const std::string &ip, int port = 80);
+  const std::string &get_hostname() const;
 
 private:
   class AdressImpl;
 
-  AdressImpl *adress;
+  std::shared_ptr<AdressImpl> adress;
 };
 
 class Header {
@@ -42,41 +39,63 @@ public:
   Header(const header_t type, const std::string &value,
          const std::string &key = "");
 
-  ~Header();
+  ~Header() = default;
 
   const std::string get_str() const;
 
-  friend std::ofstream &operator<<(std::ofstream &out, const Header &obj);
+  friend std::ostream &operator<<(std::ostream &out, const Header &obj);
 
-  static const std::string get_key_string(header_t type,
-                                          const std::string &fail_str = "");
+  static const std::string get_type_string(header_t type,
+                                           const std::string &fail_str = "");
 
   static const header_t
-  get_type_name(const std::string &key,
+  get_type_type(const std::string &name,
                 const header_t fail_type = header_t::UNKNOWN);
 
 private:
   class HeaderImpl;
 
-  HeaderImpl *header;
+  std::shared_ptr<HeaderImpl> header;
+};
+
+class Param {
+public:
+  Param(const std::string &key, const std::string &value);
+
+  ~Param() = default;
+
+  const std::string get_str() const;
+
+  friend std::ostream &operator<<(std::ostream &out, const Param &obj);
+
+private:
+  class ParamImpl;
+
+  std::shared_ptr<ParamImpl> param;
 };
 
 class Request {
 public:
   enum class request_t { GET, POST };
 
-  Request(const std::string &request);
+  Request(const Adress &addr, const std::string &request_str);
 
-  ~Request();
+  ~Request() = default;
 
-  const std::string &get_request() const;
+  const Adress &get_adress() const;
 
-  static Request format(const request_t type);
+  const std::string get_str() const;
+
+  static const std::string get_type_string(request_t type);
+
+  static Request gen(const request_t type, const Adress &addr,
+                     const std::string &path, std::vector<Header> headers,
+                     const std::vector<Param> &params);
 
 private:
   class RequestImpl;
 
-  RequestImpl *request;
+  std::shared_ptr<RequestImpl> request;
 };
 
 class Response {
@@ -96,18 +115,18 @@ private:
   SocketImpl *socket;
 };
 
-class HTTPClient {
+class Client {
 public:
-  HTTPClient();
+  Client();
 
-  ~HTTPClient();
+  ~Client();
 
 private:
-  class HTTPClientImpl;
+  class ClientImpl;
 
-  HTTPClient *client;
+  ClientImpl *client;
 };
 
-class HTTPServer {};
+class Server {};
 
-} // namespace my
+} // namespace my::http
