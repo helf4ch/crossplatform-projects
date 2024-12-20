@@ -1,4 +1,4 @@
-project(libmyjson)
+project(libmyhttp)
 
 add_subdirectory(${PROJECT_NAME}/)
 
