@@ -18,10 +18,19 @@ int main() {
   // char buf[] = "hello\n";
   // write(d, buf, 10);
 
+  nlohmann::json ex = nlohmann::json::parse(R"(
+    {
+      "pi": 3.141,
+      "happy": true
+    }
+  )");
+
+  std::string dump = ex.dump();
+
   using namespace my::http;
   Request req =
       Request::gen(Request::request_t::GET, {"127.0.0.1"}, "/some/path", {},
-                   {{"some", "param"}, {"some1", "param1"}});
+                   {{"some", "param"}, {"some1", "param1"}}, dump.c_str(), dump.size());
 
   std::cout << req.get_str();
 

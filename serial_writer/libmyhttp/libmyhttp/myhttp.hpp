@@ -90,7 +90,8 @@ public:
 
   static Request gen(const request_t type, const Adress &addr,
                      const std::string &path, std::vector<Header> headers,
-                     const std::vector<Param> &params);
+                     const std::vector<Param> &params, const char *body = NULL,
+                     const int body_lenght = 0);
 
 private:
   class RequestImpl;
@@ -100,7 +101,14 @@ private:
 
 class Response {
 public:
-  enum class response_t { R_201, R_401 };
+  enum class response_t {
+    UNKNOWN,
+    INFO,
+    SUCCESS,
+    REDIRECTION,
+    CLIENT_ERR,
+    SERVER_ERR
+  };
 };
 
 class Socket {

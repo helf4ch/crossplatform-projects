@@ -179,13 +179,13 @@ const std::string my::http::Request::get_type_string(request_t type) {
   return it->second;
 }
 
-my::http::Request my::http::Request::gen(const request_t type,
-                                         const Adress &addr,
-                                         const std::string &path,
-                                         std::vector<Header> headers,
-                                         const std::vector<Param> &params) {
+my::http::Request
+my::http::Request::gen(const request_t type, const Adress &addr,
+                       const std::string &path, std::vector<Header> headers,
+                       const std::vector<Param> &params, const char *body,
+                       const int body_lenght) {
   std::stringstream ss;
-  
+
   ss << get_type_string(type) << ' ' << path << '?';
 
   for (auto it = params.begin(); it < params.end(); ++it) {
@@ -205,6 +205,10 @@ my::http::Request my::http::Request::gen(const request_t type,
   }
 
   ss << "\r\n";
+
+  if (body) {
+    ss.write(body, body_lenght);
+  }
 
   return {addr, ss.str()};
 }
