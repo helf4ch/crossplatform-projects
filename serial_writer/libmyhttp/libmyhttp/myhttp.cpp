@@ -78,6 +78,10 @@ my::http::Header::Header(const header_t type, const std::string &value,
   header->value = value;
 }
 
+my::http::Header::Header(const std::string &key, const std::string &value) {
+  *this = Header(get_type_type(key), value);
+}
+
 const std::string my::http::Header::get_str() const {
   std::stringstream ss;
   ss << header->key << ": " << header->value << "\r\n";
@@ -167,9 +171,6 @@ const my::http::Adress &my::http::Request::get_adress() const {
   return *request->addr;
 }
 
-const std::string my::http::Request::get_str() const {
-  return request->request_str;
-}
 
 const std::string my::http::Request::get_type_string(request_t type) {
   auto it = std::find_if(RequestImpl::TYPE_TO_KEY.begin(),
@@ -212,3 +213,21 @@ my::http::Request::gen(const request_t type, const Adress &addr,
 
   return {addr, ss.str()};
 }
+
+// my::Response
+// class my::http::Response::ResponseImpl {
+// public:
+
+//   step_t cur_step;
+// };
+
+// my::http::Response::Response() {
+//   response = std::make_shared<ResponseImpl>();
+// }
+
+// my::http::Response::Response(const int status, const std::string &phrase,
+//            std::vector<Header> headers, const char *body,
+//            const int body_lenght) {
+  
+// }
+
