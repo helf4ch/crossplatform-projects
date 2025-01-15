@@ -63,33 +63,23 @@ const std::string &my::http::Adress::get_hostname() const {
 // my::http::Header
 class my::http::Header::HeaderImpl {
 public:
-  header_t type;
   std::string key;
   std::string value;
-
-  static const std::vector<std::pair<header_t, std::string>> TYPE_TO_KEY;
 };
 
-const std::vector<std::pair<my::http::Header::header_t, std::string>>
-    my::http::Header::HeaderImpl::TYPE_TO_KEY = {
-        {header_t::Host, "Host"},
-        {header_t::Date, "Date"},
-        {header_t::Content_type, "Content-type"},
-        {header_t::Content_lenght, "Content-lenght"},
-        {header_t::Connection, "Connection"}};
-
-my::http::Header::Header(const header_t type, const std::string &value,
-                         const std::string &key) {
+my::http::Header::Header(const std::string &key, const std::string &value) {
   header = std::make_shared<HeaderImpl>();
-
-  header->type = type;
-  header->key = get_type_string(header->type, key);
+  header->key = key;
   header->value = value;
 }
 
-my::http::Header::Header(const std::string &key, const std::string &value) {
-  *this = Header(get_type_type(key), value);
+const std::string &my::http::Header::get_key() const { return header->key; }
+
+void my::http::Header::set_value(const std::string &value) {
+  header->value = value;
 }
+
+const std::string &my::http::Header::get_value() const { return header->value; }
 
 const std::string my::http::Header::get_str() const {
   std::stringstream ss;
@@ -107,33 +97,6 @@ std::ostream &my::http::operator<<(std::ostream &out,
   return out;
 }
 
-const std::string
-my::http::Header::get_type_string(header_t type, const std::string &fail_str) {
-  auto it = std::find_if(HeaderImpl::TYPE_TO_KEY.begin(),
-                         HeaderImpl::TYPE_TO_KEY.end(),
-                         [type](const auto &p) { return p.first == type; });
-
-  if (it == HeaderImpl::TYPE_TO_KEY.end()) {
-    return fail_str;
-  }
-
-  return it->second;
-}
-
-const my::http::Header::header_t
-my::http::Header::get_type_type(const std::string &name,
-                                const header_t fail_type) {
-  auto it = std::find_if(HeaderImpl::TYPE_TO_KEY.begin(),
-                         HeaderImpl::TYPE_TO_KEY.end(),
-                         [name](const auto &p) { return p.second == name; });
-
-  if (it == HeaderImpl::TYPE_TO_KEY.end()) {
-    return fail_type;
-  }
-
-  return it->first;
-}
-
 // my::http::Param
 class my::http::Param::ParamImpl {
 public:
@@ -143,15 +106,26 @@ public:
 
 my::http::Param::Param(const std::string &key, const std::string &value) {
   param = std::make_shared<ParamImpl>();
-
   param->key = key;
   param->value = value;
 }
+
+const std::string &my::http::Param::get_key() const { return param->key; }
+
+void my::http::Param::set_value(const std::string &value) {
+  param->value = value;
+}
+
+const std::string &my::http::Param::get_value() const { return param->value; }
 
 const std::string my::http::Param::get_str() const {
   std::stringstream ss;
   ss << param->key << '=' << param->value;
   return ss.str();
+}
+
+bool my::http::operator<(const Param &lhs, const Param &rhs) {
+  return lhs.get_key() < rhs.get_key();
 }
 
 std::ostream &my::http::operator<<(std::ostream &out,
@@ -165,19 +139,16 @@ class my::http::Request::RequestImpl {
 public:
   std::unique_ptr<Adress> addr;
 
-  request_t type;
+  std::string type;
   std::string url;
-  const std::string HTTP_VER = "HTTP/1.1";
+  std::string http_ver = "HTTP/1.1";
+  std::set<Param> params;
   std::set<Header> headers;
   char *body = nullptr;
   int body_size = 0;
-
-  static const std::vector<std::pair<request_t, std::string>> TYPE_TO_KEY;
 };
 
-const std::vector<std::pair<my::http::Request::request_t, std::string>>
-    my::http::Request::RequestImpl::TYPE_TO_KEY = {{request_t::GET, "GET"},
-                                                   {request_t::POST, "POST"}};
+my::http::Request::Request() { request = std::make_shared<RequestImpl>(); }
 
 void my::http::Request::set_adress(const my::http::Adress &addr) {
   *request->addr = addr;
@@ -187,17 +158,43 @@ const my::http::Adress &my::http::Request::get_adress() const {
   return *request->addr;
 }
 
-void my::http::Request::set_type(const my::http::Request::request_t type) {
+void my::http::Request::set_type(const std::string &type) {
   request->type = type;
 }
 
-const my::http::Request::request_t my::http::Request::get_type() const {
-  return request->type;
-}
+const std::string my::http::Request::get_type() const { return request->type; }
 
 void my::http::Request::set_url(const std::string &url) { request->url = url; }
 
+void my::http::Request::add_param(const Param &param) {
+  request->params.insert(param);
+}
+
+my::http::Param &my::http::Request::get_param(const std::string &key) {
+  return const_cast<Param &>(
+      *std::find_if(request->params.begin(), request->params.end(),
+                    [key](auto &it) { return it.get_key() == key; }));
+}
+
+const std::set<my::http::Param> &my::http::Request::get_params() const {
+  return request->params;
+}
+
 const std::string &my::http::Request::get_url() const { return request->url; }
+
+void my::http::Request::set_http_ver(const std::string &ver) {
+  request->http_ver = ver;
+}
+
+const std::string &my::http::Request::get_http_ver() const {
+  return request->http_ver;
+}
+
+my::http::Header &my::http::Request::get_header(const std::string key) {
+  return const_cast<Header &>(
+      *std::find_if(request->headers.begin(), request->headers.end(),
+                    [key](auto &it) { return it.get_key() == key; }));
+}
 
 void my::http::Request::add_header(const Header &header) {
   request->headers.insert(header);
@@ -220,8 +217,13 @@ const std::pair<const char *, int> my::http::Request::get_body() const {
 const std::pair<std::unique_ptr<char[]>, int> my::http::Request::dump() {
   std::stringstream ss;
 
-  ss << get_type_string(request->type) << ' ' << request->url << ' '
-     << request->HTTP_VER << "\r\n";
+  ss << request->type << ' ' << request->url << '?';
+
+  for (auto &it : request->params) {
+    ss << it << '?';
+  }
+
+  ss << ' ' << request->http_ver << "\r\n";
 
   for (auto &it : request->headers) {
     ss << it << "\r\n";
@@ -234,70 +236,186 @@ const std::pair<std::unique_ptr<char[]>, int> my::http::Request::dump() {
   size_t size = msg.size() + request->body_size;
   std::unique_ptr<char[]> ptr(new char[size]);
 
-  memcpy(ptr.get(), msg.c_str(), msg.size()); 
+  memcpy(ptr.get(), msg.c_str(), msg.size());
   memcpy(ptr.get() + msg.size() + 1, request->body, request->body_size);
 
   return {std::move(ptr), size};
 }
 
 std::vector<std::string> split(std::string s, std::string delimiter) {
-    size_t pos_start = 0, pos_end, delim_len = delimiter.length();
-    std::string token;
-    std::vector<std::string> res;
+  size_t pos_start = 0, pos_end, delim_len = delimiter.length();
+  std::string token;
+  std::vector<std::string> res;
 
-    while ((pos_end = s.find(delimiter, pos_start)) != std::string::npos) {
-        token = s.substr (pos_start, pos_end - pos_start);
-        pos_start = pos_end + delim_len;
-        res.push_back (token);
-    }
+  while ((pos_end = s.find(delimiter, pos_start)) != std::string::npos) {
+    token = s.substr(pos_start, pos_end - pos_start);
+    pos_start = pos_end + delim_len;
+    res.push_back(token);
+  }
 
-    res.push_back (s.substr (pos_start));
-    return res;
+  res.push_back(s.substr(pos_start));
+  return res;
 }
 
-#include <iostream>
 my::http::Request my::http::Request::parse(const std::string &request) {
   auto lines = split(request, "\r\n");
 
-  for (auto &it : lines) {
-    std::cout << it << '\n';
+  if (lines.back() != "\r\n") {
+    // error
   }
 
   Request req;
 
-  
+  std::stringstream ss(lines[0]);
+  std::string buf;
 
-  return {};
+  ss >> buf;
+  req.set_type(buf);
+
+  ss >> buf;
+  auto url_split = split(buf, "?");
+  req.set_url(url_split[0]);
+
+  for (int i = 1; i < url_split.size(); ++i) {
+    auto pos = url_split[i].find("=");
+    std::string key = url_split[i].substr(0, pos);
+    std::string value = url_split[i].substr(pos + 1, url_split[i].size());
+    req.add_param({key, value});
+  }
+
+  ss >> buf;
+  req.set_http_ver(buf);
+
+  for (int i = 1; i < lines.size() - 2; ++i) {
+    auto pos = lines[i].find(":");
+    std::string key = lines[i].substr(0, pos);
+    std::stringstream ss(lines[i].substr(pos + 1, lines[i].size()));
+    std::string value;
+    ss >> value;
+    req.add_header({key, value});
+  }
+
+  return req;
 }
 
-const std::string my::http::Request::get_type_string(request_t type) {
-  auto it = std::find_if(RequestImpl::TYPE_TO_KEY.begin(),
-                         RequestImpl::TYPE_TO_KEY.end(),
-                         [type](const auto &p) { return p.first == type; });
+class my::http::Response::ResponseImpl {
+public:
+  std::unique_ptr<Adress> addr;
 
-  return it->second;
+  std::string http_ver = "HTTP/1.1";
+  int code;
+  std::string text;
+  std::set<Header> headers;
+  char *body = nullptr;
+  int body_size = 0;
+};
+
+my::http::Response::Response() { response = std::make_shared<ResponseImpl>(); }
+
+void my::http::Response::set_adress(const my::http::Adress &addr) {
+  *response->addr = addr;
 }
 
-const my::http::Request::get_type my::http::Request::get_type_type(std::string type) {
-  auto it = std::find_if(RequestImpl::TYPE_TO_KEY.begin(),
-                         RequestImpl::TYPE_TO_KEY.end(),
-                         [type](const auto &p) { return p.first == type; });
+const my::http::Adress &my::http::Response::get_adress() const {
+  return *response->addr;
+}
 
-  return it->second;
+void my::http::Response::set_http_ver(const std::string &ver) {
+  response->http_ver = ver;
+}
 
-// my::Response
-// class my::http::Response::ResponseImpl {
-// public:
+const std::string &my::http::Response::get_http_ver() const {
+  return response->http_ver;
+}
 
-//   step_t cur_step;
-// };
+void my::http::Response::set_code(const int code) { response->code = code; }
 
-// my::http::Response::Response() {
-//   response = std::make_shared<ResponseImpl>();
-// }
+const int my::http::Response::get_code() const { return response->code; }
 
-// my::http::Response::Response(const int status, const std::string &phrase,
-//            std::vector<Header> headers, const char *body,
-//            const int body_lenght) {
+void my::http::Response::set_text(const std::string &text) {
+  response->text = text;
+}
 
-// }
+const std::string &my::http::Response::get_text() const {
+  return response->text;
+}
+
+void my::http::Response::add_header(const Header &header) {
+  response->headers.insert(header);
+}
+
+my::http::Header &my::http::Response::get_header(const std::string key) {
+  return const_cast<Header &>(
+      *std::find_if(response->headers.begin(), response->headers.end(),
+                    [key](auto &it) { return it.get_key() == key; }));
+}
+
+const std::set<my::http::Header> &my::http::Response::get_headers() const {
+  return response->headers;
+}
+
+void my::http::Response::set_body(const char *body, const int body_lenght) {
+  response->body = new char[body_lenght];
+  memcpy(response->body, body, body_lenght);
+  response->body_size = body_lenght;
+}
+
+const std::pair<const char *, int> my::http::Response::get_body() const {
+  return {response->body, response->body_size};
+}
+
+const std::pair<std::unique_ptr<char[]>, int> my::http::Response::dump() {
+  std::stringstream ss;
+
+  ss << response->http_ver << ' ' << response->code << ' ' << response->text
+     << "\r\n";
+
+  for (auto &it : response->headers) {
+    ss << it << "\r\n";
+  }
+
+  ss << "\r\n";
+
+  std::string msg = ss.str();
+
+  size_t size = msg.size() + response->body_size;
+  std::unique_ptr<char[]> ptr(new char[size]);
+
+  memcpy(ptr.get(), msg.c_str(), msg.size());
+  memcpy(ptr.get() + msg.size() + 1, response->body, response->body_size);
+
+  return {std::move(ptr), size};
+}
+
+my::http::Response my::http::Response::parse(const std::string &request) {
+  auto lines = split(request, "\r\n");
+
+  if (lines.back() != "\r\n") {
+    // error
+  }
+
+  Response res;
+
+  std::stringstream ss(lines[0]);
+  std::string buf;
+
+  ss >> buf;
+  res.set_http_ver(buf);
+
+  ss >> buf;
+  res.set_code(std::stoi(buf));
+
+  ss >> buf;
+  res.set_text(buf);
+
+  for (int i = 1; i < lines.size() - 1; ++i) {
+    auto pos = lines[i].find(":");
+    std::string key = lines[i].substr(0, pos);
+    std::stringstream ss(lines[i].substr(pos + 1, lines[i].size()));
+    std::string value;
+    ss >> value;
+    res.add_header({key, value});
+  }
+
+  return res;
+}

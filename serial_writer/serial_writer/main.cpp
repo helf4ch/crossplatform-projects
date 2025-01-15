@@ -31,7 +31,24 @@ int main() {
                     "Host: jopa.com\r\n"
                     "\r\n";
 
-  my::http::Request::parse(req);
+  auto r = my::http::Request::parse(req);
+
+  std::cout << "type: " << r.get_type() << '\n';
+  std::cout << "url: " << r.get_url() << '\n';
+  std::cout << "param: " << r.get_param("da") << '\n';
+  std::cout << "header: " << r.get_header("Host") << '\n';
+
+  std::string res = "HTTP/1.1 201 Created\r\n"
+                    "Content-Type: application/json\r\n"
+                    "Location: http://example.com/users/123\r\n";
+
+  std::cout << '\n';
+
+  auto r1 = my::http::Response::parse(res);
+  std::cout << "http: " << r1.get_http_ver() << '\n';
+  std::cout << "code: " << r1.get_code() << '\n';
+  std::cout << "text: " << r1.get_text() << '\n';
+  std::cout << "header: " << r1.get_header("Content-Type") << '\n';
 
   return 0;
 }

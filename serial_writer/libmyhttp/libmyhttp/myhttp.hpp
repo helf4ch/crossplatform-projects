@@ -31,34 +31,20 @@ private:
 
 class Header {
 public:
-  enum class header_t {
-    UNKNOWN,
-    Host,
-    Date,
-    Content_type,
-    Content_lenght,
-    Connection
-  };
-
-  Header(const header_t type, const std::string &value,
-         const std::string &key = "");
-
   Header(const std::string &key, const std::string &value);
 
   ~Header() = default;
+
+  const std::string &get_key() const;
+
+  void set_value(const std::string &value);
+  const std::string &get_value() const;
 
   const std::string get_str() const;
 
   friend bool operator<(const Header &lhs, const Header &rhs);
 
   friend std::ostream &operator<<(std::ostream &out, const Header &obj);
-
-  static const std::string get_type_string(header_t type,
-                                           const std::string &fail_str = "");
-
-  static const header_t
-  get_type_type(const std::string &name,
-                const header_t fail_type = header_t::UNKNOWN);
 
 private:
   class HeaderImpl;
@@ -72,7 +58,14 @@ public:
 
   ~Param() = default;
 
+  const std::string &get_key() const;
+
+  void set_value(const std::string &value);
+  const std::string &get_value() const;
+
   const std::string get_str() const;
+
+  friend bool operator<(const Param &lhs, const Param &rhs);
 
   friend std::ostream &operator<<(std::ostream &out, const Param &obj);
 
@@ -84,30 +77,34 @@ private:
 
 class Request {
 public:
-  enum class request_t { GET, POST };
-
-  Request() = default;
+  Request();
 
   ~Request() = default;
 
   void set_adress(const Adress &addr);
   const Adress &get_adress() const;
 
-  void set_type(const request_t type);
-  const request_t get_type() const;
+  void set_type(const std::string & type);
+  const std::string get_type() const;
 
   void set_url(const std::string &url);
   const std::string &get_url() const;
 
+  void add_param(const Param &param);
+  Param &get_param(const std::string &key);
+  const std::set<Param> &get_params() const;
+
+  void set_http_ver(const std::string &ver);
+  const std::string &get_http_ver() const;
+
   void add_header(const Header &header);
+  Header &get_header(const std::string key);
   const std::set<Header> &get_headers() const;
 
   void set_body(const char *body, const int body_lenght);
   const std::pair<const char*, int> get_body() const;
 
   const std::pair<std::unique_ptr<char[]>, int> dump();
-
-  static const std::string get_type_string(request_t type);
 
   static Request parse(const std::string &request);
 
@@ -119,46 +116,37 @@ private:
 
 class Response {
 public:
-  enum class response_t {
-    UNKNOWN,
-    INFO,
-    SUCCESS,
-    REDIRECTION,
-    CLIENT_ERR,
-    SERVER_ERR
-  };
-
-  Response(const int status, const std::string &phrase,
-           std::vector<Header> headers, const char *body = nullptr,
-           const int body_lenght = 0);
+  Response();
 
   ~Response() = default;
 
-  void set_status(const int status, const std::string &phrase);
+  void set_adress(const Adress &addr);
+  const Adress &get_adress() const;
 
-  const response_t get_type() const;
+  void set_http_ver(const std::string &ver);
+  const std::string &get_http_ver() const;
 
-  const std::pair<int, const std::string&> get_status() const;
+  void set_code(const int code);
+  const int get_code() const;
 
-  const std::string &get_response() const;
+  void set_text(const std::string &text);
+  const std::string &get_text() const;
 
   void add_header(const Header &header);
-
-  const std::vector<Header> &get_headers() const;
+  Header &get_header(const std::string key);
+  const std::set<Header> &get_headers() const;
 
   void set_body(const char *body, const int body_lenght);
-
   const std::pair<const char*, int> get_body() const;
 
-  const std::pair<const char*, int> get_msg();
+  const std::pair<std::unique_ptr<char[]>, int> dump();
+
+  static Response parse(const std::string &request);
 
 private:
   class ResponseImpl;
 
   std::shared_ptr<ResponseImpl> response;
-};
-
-class ResponseParser {
 };
 
 class Socket {
