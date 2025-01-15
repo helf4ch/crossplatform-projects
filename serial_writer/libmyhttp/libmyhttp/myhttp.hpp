@@ -4,11 +4,15 @@
 #include <netinet/in.h>
 #include <string>
 #include <vector>
+#include <set>
 
 namespace my::http {
 
 class Adress {
 public:
+
+  Adress();
+  
   Adress(const std::string &name, int port = 80);
 
   ~Adress() = default;
@@ -45,6 +49,8 @@ public:
 
   const std::string get_str() const;
 
+  friend bool operator<(const Header &lhs, const Header &rhs);
+
   friend std::ostream &operator<<(std::ostream &out, const Header &obj);
 
   static const std::string get_type_string(header_t type,
@@ -80,26 +86,30 @@ class Request {
 public:
   enum class request_t { GET, POST };
 
-  Request(const Adress &addr, const char *msg, const int size);
+  Request() = default;
 
   ~Request() = default;
 
+  void set_adress(const Adress &addr);
   const Adress &get_adress() const;
 
-  const std::string &get_request() const;
+  void set_type(const request_t type);
+  const request_t get_type() const;
 
-  const std::vector<Header> &get_headers() const;
+  void set_url(const std::string &url);
+  const std::string &get_url() const;
 
+  void add_header(const Header &header);
+  const std::set<Header> &get_headers() const;
+
+  void set_body(const char *body, const int body_lenght);
   const std::pair<const char*, int> get_body() const;
 
-  const std::pair<const char*, int> get_msg() const;
+  const std::pair<std::unique_ptr<char[]>, int> dump();
 
   static const std::string get_type_string(request_t type);
 
-  static Request gen(const request_t type, const Adress &addr,
-                     const std::string &path, std::vector<Header> headers,
-                     const std::vector<Param> &params, const char *body = NULL,
-                     const int body_lenght = 0);
+  static Request parse(const std::string &request);
 
 private:
   class RequestImpl;
@@ -124,15 +134,23 @@ public:
 
   ~Response() = default;
 
+  void set_status(const int status, const std::string &phrase);
+
   const response_t get_type() const;
+
+  const std::pair<int, const std::string&> get_status() const;
 
   const std::string &get_response() const;
 
+  void add_header(const Header &header);
+
   const std::vector<Header> &get_headers() const;
+
+  void set_body(const char *body, const int body_lenght);
 
   const std::pair<const char*, int> get_body() const;
 
-  const std::pair<const char*, int> get_msg() const;
+  const std::pair<const char*, int> get_msg();
 
 private:
   class ResponseImpl;
@@ -140,32 +158,7 @@ private:
   std::shared_ptr<ResponseImpl> response;
 };
 
-class ResponseParser : public Response {
-public:
-  enum class step_t {
-    INFO,
-    HEADERS,
-    BODY
-  }; 
-
-  ResponseParser();
-
-  ~ResponseParser() = default;
-
-  bool parse_line(const std::string &line);
-
-  const step_t get_cur_step() const;
-
-  void set_status(const int status, const std::string &phrase);
-
-  void add_header(const Header &header);
-
-  void set_body(const char *body, const int body_lenght);
-
-private:
-  class ResponseParserImpl;
-
-  std::shared_ptr<ResponseParserImpl> parser;
+class ResponseParser {
 };
 
 class Socket {
