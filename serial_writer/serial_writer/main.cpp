@@ -29,6 +29,7 @@ int main() {
 
   std::string req = "GET /url?da=jopa HTTP/1.1\r\n"
                     "Host: jopa.com\r\n"
+                    "Host1: jopa.com\r\n"
                     "\r\n";
 
   auto r = my::http::Request::parse(req);
@@ -40,7 +41,8 @@ int main() {
 
   std::string res = "HTTP/1.1 201 Created\r\n"
                     "Content-Type: application/json\r\n"
-                    "Location: http://example.com/users/123\r\n";
+                    "Location: http://example.com/users/123\r\n"
+                    "\r\n";
 
   std::cout << '\n';
 

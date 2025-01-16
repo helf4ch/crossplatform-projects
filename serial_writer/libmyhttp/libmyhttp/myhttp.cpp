@@ -95,7 +95,7 @@ const std::string &my::http::Header::get_value() const { return header->value; }
 
 const std::string my::http::Header::get_str() const {
   std::stringstream ss;
-  ss << header->key << ": " << header->value << "\r\n";
+  ss << header->key << ": " << header->value;
   return ss.str();
 }
 
@@ -304,7 +304,7 @@ my::http::Request my::http::Request::parse(const std::string &request) {
   for (int i = 1; i < lines.size() - 2; ++i) {
     auto pos = lines[i].find(":");
     std::string key = lines[i].substr(0, pos);
-    std::string value = lines[i].substr(pos + 1);
+    std::string value = lines[i].substr(pos + 2);
     req.add_header({key, value});
   }
 
@@ -417,10 +417,10 @@ my::http::Response my::http::Response::parse(const std::string &request) {
   ss >> buf;
   res.set_text(buf);
 
-  for (int i = 1; i < lines.size() - 1; ++i) {
+  for (int i = 1; i < lines.size() - 2; ++i) {
     auto pos = lines[i].find(":");
     std::string key = lines[i].substr(0, pos);
-    std::string value = lines[i].substr(pos + 1);
+    std::string value = lines[i].substr(pos + 2);
     res.add_header({key, value});
   }
 
