@@ -20,4 +20,5 @@ endif()
 
 add_subdirectory(json/)
 add_subdirectory(libmyhttp/)
+add_subdirectory(libmycommon/)
 add_subdirectory(${PROJECT_NAME}/)

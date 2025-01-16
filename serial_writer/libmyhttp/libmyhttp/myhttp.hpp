@@ -3,8 +3,8 @@
 #include <memory>
 #include <netinet/in.h>
 #include <string>
-#include <vector>
 #include <set>
+#include <netdb.h>
 
 namespace my::http {
 
@@ -17,7 +17,7 @@ public:
 
   ~Adress() = default;
 
-  const struct sockaddr_in &get_addr() const;
+  const struct addrinfo *get_addr() const;
 
   const int get_port() const;
 
@@ -102,9 +102,9 @@ public:
   const std::set<Header> &get_headers() const;
 
   void set_body(const char *body, const int body_lenght);
-  const std::pair<const char*, int> get_body() const;
+  const std::pair<std::shared_ptr<char[]>, int> get_body() const;
 
-  const std::pair<std::unique_ptr<char[]>, int> dump();
+  const std::pair<std::shared_ptr<char[]>, int> dump() const;
 
   static Request parse(const std::string &request);
 
@@ -137,9 +137,9 @@ public:
   const std::set<Header> &get_headers() const;
 
   void set_body(const char *body, const int body_lenght);
-  const std::pair<const char*, int> get_body() const;
+  const std::pair<std::shared_ptr<char[]>, int> get_body() const;
 
-  const std::pair<std::unique_ptr<char[]>, int> dump();
+  const std::pair<std::shared_ptr<char[]>, int> dump() const;
 
   static Response parse(const std::string &request);
 
@@ -149,28 +149,37 @@ private:
   std::shared_ptr<ResponseImpl> response;
 };
 
-class Socket {
+class Connection {
 public:
-  Socket();
+  Connection();
 
-  ~Socket();
+  ~Connection() = default;
+
+  int get_socket();
+
 
 private:
-  class SocketImpl;
+  class ConnectionImpl;
 
-  SocketImpl *socket;
+  std::shared_ptr<ConnectionImpl> conn;
 };
 
 class Client {
 public:
   Client();
 
-  ~Client();
+  ~Client() = default;
+
+  void connect(const Adress &addr);
+
+  void send(const Request &req);
+
+  Response receive();
 
 private:
   class ClientImpl;
 
-  ClientImpl *client;
+  std::shared_ptr<ClientImpl> client;
 };
 
 class Server {};

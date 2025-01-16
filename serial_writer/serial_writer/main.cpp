@@ -50,5 +50,19 @@ int main() {
   std::cout << "text: " << r1.get_text() << '\n';
   std::cout << "header: " << r1.get_header("Content-Type") << '\n';
 
+
+  std::string request = "GET /data/2.5/weather?lat=43.0147&lon=131.8642&appid= HTTP/1.1\r\n"
+                        "Host: api.openweathermap.org\r\n"
+                        "\r\n";
+
+  my::http::Client cl;
+  cl.connect({"api.openweathermap.org"});
+
+  cl.send(my::http::Request::parse(request));
+
+  auto answer = cl.receive();
+
+  std::cout << std::string(answer.dump().first.get(), answer.dump().second);
+
   return 0;
 }

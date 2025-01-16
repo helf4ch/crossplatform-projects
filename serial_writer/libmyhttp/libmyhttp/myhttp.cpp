@@ -1,7 +1,10 @@
 #include "myhttp.hpp"
 
+#include "libmycommon/mycommon.hpp"
+
 #include <algorithm>
 #include <arpa/inet.h>
+#include <cstddef>
 #include <cstring>
 #include <memory>
 #include <netdb.h>
@@ -9,14 +12,25 @@
 #include <set>
 #include <sstream>
 #include <sys/socket.h>
+#include <unistd.h>
 #include <vector>
+
+#include <asm/termbits.h>
+#include <sys/ioctl.h>
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
+
+#include <iostream>
 
 // my::http::Adress
 class my::http::Adress::AdressImpl {
 public:
+  ~AdressImpl() { freeaddrinfo(addr); }
+
   int port;
   std::string hostname;
-  struct sockaddr_in addr;
+  struct addrinfo *addr;
 };
 
 my::http::Adress::Adress() {
@@ -24,33 +38,31 @@ my::http::Adress::Adress() {
 
   adress->port = 0;
   adress->hostname = "";
-  memset(&adress->addr, 0, sizeof(adress->addr));
 }
 
 my::http::Adress::Adress(const std::string &name, int port) {
   adress = std::make_shared<AdressImpl>();
 
   adress->port = port;
+  adress->hostname = name;
 
-  std::stringstream ss;
-  ss << name;
-  if (port != 80 && port != 443) {
-    ss << ':' << adress->port;
-    adress->hostname = ss.str();
+  int status;
+  struct addrinfo hints;
+
+  memset(&hints, 0, sizeof hints);
+  hints.ai_family = AF_INET;      
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_flags = AI_PASSIVE;    
+
+  status = getaddrinfo(name.c_str(), std::to_string(port).c_str(), &hints,
+                       &adress->addr);
+
+  if (status) {
+    throw my::common::Exception("Error in my::http::Adress.", h_errno);
   }
-
-  adress->hostname = ss.str();
-
-  struct hostent *host = gethostbyname(name.c_str());
-
-  memset(&adress->addr, 0, sizeof(adress->addr));
-
-  adress->addr.sin_family = AF_INET;
-  adress->addr.sin_port = htons(port);
-  memcpy(&adress->addr.sin_addr.s_addr, host->h_addr_list, host->h_length);
 }
 
-const struct sockaddr_in &my::http::Adress::get_addr() const {
+const struct addrinfo *my::http::Adress::get_addr() const {
   return adress->addr;
 }
 
@@ -144,7 +156,7 @@ public:
   std::string http_ver = "HTTP/1.1";
   std::set<Param> params;
   std::set<Header> headers;
-  char *body = nullptr;
+  std::shared_ptr<char[]>body;
   int body_size = 0;
 };
 
@@ -205,22 +217,22 @@ const std::set<my::http::Header> &my::http::Request::get_headers() const {
 }
 
 void my::http::Request::set_body(const char *body, const int body_lenght) {
-  request->body = new char[body_lenght];
-  memcpy(request->body, body, body_lenght);
+  request->body = std::shared_ptr<char[]>(new char[body_lenght]);
+  memcpy(request->body.get(), body, body_lenght);
   request->body_size = body_lenght;
 }
 
-const std::pair<const char *, int> my::http::Request::get_body() const {
+const std::pair<std::shared_ptr<char[]>, int> my::http::Request::get_body() const {
   return {request->body, request->body_size};
 }
 
-const std::pair<std::unique_ptr<char[]>, int> my::http::Request::dump() {
+const std::pair<std::shared_ptr<char[]>, int> my::http::Request::dump() const {
   std::stringstream ss;
 
   ss << request->type << ' ' << request->url << '?';
 
   for (auto &it : request->params) {
-    ss << it << '?';
+    ss << it << '&';
   }
 
   ss << ' ' << request->http_ver << "\r\n";
@@ -234,12 +246,12 @@ const std::pair<std::unique_ptr<char[]>, int> my::http::Request::dump() {
   std::string msg = ss.str();
 
   size_t size = msg.size() + request->body_size;
-  std::unique_ptr<char[]> ptr(new char[size]);
+  std::shared_ptr<char[]> ptr(new char[size]);
 
   memcpy(ptr.get(), msg.c_str(), msg.size());
-  memcpy(ptr.get() + msg.size() + 1, request->body, request->body_size);
+  memcpy(ptr.get() + msg.size() + 1, request->body.get(), request->body_size);
 
-  return {std::move(ptr), size};
+  return {ptr, size};
 }
 
 std::vector<std::string> split(std::string s, std::string delimiter) {
@@ -260,10 +272,6 @@ std::vector<std::string> split(std::string s, std::string delimiter) {
 my::http::Request my::http::Request::parse(const std::string &request) {
   auto lines = split(request, "\r\n");
 
-  if (lines.back() != "\r\n") {
-    // error
-  }
-
   Request req;
 
   std::stringstream ss(lines[0]);
@@ -276,11 +284,18 @@ my::http::Request my::http::Request::parse(const std::string &request) {
   auto url_split = split(buf, "?");
   req.set_url(url_split[0]);
 
-  for (int i = 1; i < url_split.size(); ++i) {
-    auto pos = url_split[i].find("=");
-    std::string key = url_split[i].substr(0, pos);
-    std::string value = url_split[i].substr(pos + 1, url_split[i].size());
-    req.add_param({key, value});
+  auto param_pos = buf.find("?");
+  req.set_url(buf.substr(0, param_pos));
+
+  if (param_pos != std::string::npos) {
+    auto param_split = split(buf.substr(param_pos + 1), "&");
+
+    for (int i = 0; i < param_split.size(); ++i) {
+      auto pos = param_split[i].find("=");
+      std::string key = param_split[i].substr(0, pos);
+      std::string value = param_split[i].substr(pos + 1, param_split[i].size());
+      req.add_param({key, value});
+    }
   }
 
   ss >> buf;
@@ -289,9 +304,7 @@ my::http::Request my::http::Request::parse(const std::string &request) {
   for (int i = 1; i < lines.size() - 2; ++i) {
     auto pos = lines[i].find(":");
     std::string key = lines[i].substr(0, pos);
-    std::stringstream ss(lines[i].substr(pos + 1, lines[i].size()));
-    std::string value;
-    ss >> value;
+    std::string value = lines[i].substr(pos + 1);
     req.add_header({key, value});
   }
 
@@ -306,7 +319,7 @@ public:
   int code;
   std::string text;
   std::set<Header> headers;
-  char *body = nullptr;
+  std::shared_ptr<char[]> body;
   int body_size = 0;
 };
 
@@ -355,16 +368,16 @@ const std::set<my::http::Header> &my::http::Response::get_headers() const {
 }
 
 void my::http::Response::set_body(const char *body, const int body_lenght) {
-  response->body = new char[body_lenght];
-  memcpy(response->body, body, body_lenght);
+  response->body = std::shared_ptr<char[]>(new char[body_lenght]);
+  memcpy(response->body.get(), body, body_lenght);
   response->body_size = body_lenght;
 }
 
-const std::pair<const char *, int> my::http::Response::get_body() const {
+const std::pair<std::shared_ptr<char[]>, int> my::http::Response::get_body() const {
   return {response->body, response->body_size};
 }
 
-const std::pair<std::unique_ptr<char[]>, int> my::http::Response::dump() {
+const std::pair<std::shared_ptr<char[]>, int> my::http::Response::dump() const {
   std::stringstream ss;
 
   ss << response->http_ver << ' ' << response->code << ' ' << response->text
@@ -379,20 +392,16 @@ const std::pair<std::unique_ptr<char[]>, int> my::http::Response::dump() {
   std::string msg = ss.str();
 
   size_t size = msg.size() + response->body_size;
-  std::unique_ptr<char[]> ptr(new char[size]);
+  std::shared_ptr<char[]> ptr(new char[size]);
 
   memcpy(ptr.get(), msg.c_str(), msg.size());
-  memcpy(ptr.get() + msg.size() + 1, response->body, response->body_size);
+  memcpy(ptr.get() + msg.size() + 1, response->body.get(), response->body_size);
 
-  return {std::move(ptr), size};
+  return {ptr, size};
 }
 
 my::http::Response my::http::Response::parse(const std::string &request) {
   auto lines = split(request, "\r\n");
-
-  if (lines.back() != "\r\n") {
-    // error
-  }
 
   Response res;
 
@@ -411,11 +420,125 @@ my::http::Response my::http::Response::parse(const std::string &request) {
   for (int i = 1; i < lines.size() - 1; ++i) {
     auto pos = lines[i].find(":");
     std::string key = lines[i].substr(0, pos);
-    std::stringstream ss(lines[i].substr(pos + 1, lines[i].size()));
-    std::string value;
-    ss >> value;
+    std::string value = lines[i].substr(pos + 1);
     res.add_header({key, value});
   }
+
+  return res;
+}
+
+// Client
+class my::http::Client::ClientImpl {
+public:
+  Adress addr;
+  int socket;
+  bool is_connected;
+};
+
+my::http::Client::Client() {
+  client = std::make_shared<ClientImpl>();
+  client->socket = ::socket(AF_INET, SOCK_STREAM, 0);
+  client->is_connected = false;
+}
+
+void my::http::Client::connect(const Adress &addr) {
+  int res = ::connect(client->socket, addr.get_addr()->ai_addr,
+                      addr.get_addr()->ai_addrlen);
+
+  if (res) {
+    throw my::common::Exception("Error in my::http::Client::Connect.", errno);
+  }
+}
+
+void my::http::Client::send(const Request &req) {
+  auto dump = req.dump();
+  auto msg = dump.first;
+  auto size = dump.second;
+
+  int sent = 0;
+  do {
+    int bytes = write(client->socket, msg.get() + sent, size - sent);
+
+    if (bytes < 0) {
+      throw my::common::Exception("Error in my::http::Client::send.", errno);
+    }
+
+    if (bytes == 0) {
+      break;
+    }
+
+    sent += bytes;
+  } while (sent < size);
+}
+
+my::http::Response my::http::Client::receive() {
+  int bufsize = 1024;
+  char *buf = new char[bufsize]();
+  int received = 0;
+  std::string end_of_read = "\r\n\r\n";
+  int num_read = 1;
+  while (true) {
+    int bytes = read(client->socket, buf + received, num_read);
+
+    if (bytes < 0) {
+      throw my::common::Exception("Error in my::http::Client::receive.", errno);
+    }
+
+    received += num_read;
+
+    if (bytes == 0) {
+      break;
+    }
+
+    char *end_pos = strstr(buf, end_of_read.c_str());
+    if (end_pos != NULL) {
+      break;
+    }
+
+    if (received == bufsize) {
+      int new_bufsize = bufsize * 2;
+      char *new_buf = new char[new_bufsize]();
+      strcpy(new_buf, buf);
+      delete[] buf;
+      bufsize = new_bufsize;
+      buf = new_buf;
+    }
+  }
+
+  auto res = Response::parse(buf);
+
+  delete[] buf;
+
+  int len = 0;
+  ioctl(client->socket, FIONREAD, &len);
+
+  bufsize = 1024;
+  buf = new char[bufsize]();
+  received = 0;
+  while (true) {
+    int bytes = read(client->socket, buf + received, len - received);
+
+    if (bytes < 0) {
+      throw my::common::Exception("Error in my::http::Client::receive.", errno);
+    }
+
+    received += bytes;
+
+    if (bytes == 0 || received == len) {
+      break;
+    }
+
+    if (received == bufsize) {
+      int new_bufsize = bufsize * 2;
+      char *new_buf = new char[new_bufsize]();
+      strcpy(new_buf, buf);
+      delete[] buf;
+      bufsize = new_bufsize;
+      buf = new_buf;
+    }
+  }
+
+  res.set_body(buf, received + 1);
 
   return res;
 }
