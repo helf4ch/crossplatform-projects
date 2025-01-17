@@ -5,10 +5,11 @@
 // #include <fcntl.h>
 
 #include "libmyhttp/myhttp.hpp"
+#include "nlohmann/json_fwd.hpp"
 #include <iostream>
 #include <nlohmann/json.hpp>
 
-int main() {
+int main(int argc, char **argv) {
   // auto d = open("/dev/pts/4", O_WRONLY);
 
   // if (d == 0) {
@@ -18,44 +19,22 @@ int main() {
   // char buf[] = "hello\n";
   // write(d, buf, 10);
 
-  nlohmann::json ex = nlohmann::json::parse(R"(
-    {
-      "pi": 3.141,
-      "happy": true
-    }
-  )");
+  if (argc < 4) {
+    std::cout << "Usage: [api_key] [lat] [lon]\n";
+    return 0;
+  }
 
-  std::string dump = ex.dump();
+  std::string appid = argv[1];
+  std::string lat = argv[2];
+  std::string lon = argv[3];
 
-  std::string req = "GET /url?da=jopa HTTP/1.1\r\n"
-                    "Host: jopa.com\r\n"
-                    "Host1: jopa.com\r\n"
-                    "\r\n";
+  std::stringstream ss;
+  ss << "GET /data/2.5/weather?lat=" << lat << "&lon=" << lon
+     << "&appid=" << appid << " HTTP/1.1\r\n"
+     << "Host: api.openweathermap.org\r\n"
+     << "\r\n";
 
-  auto r = my::http::Request::parse(req);
-
-  std::cout << "type: " << r.get_type() << '\n';
-  std::cout << "url: " << r.get_url() << '\n';
-  std::cout << "param: " << r.get_param("da") << '\n';
-  std::cout << "header: " << r.get_header("Host") << '\n';
-
-  std::string res = "HTTP/1.1 201 Created\r\n"
-                    "Content-Type: application/json\r\n"
-                    "Location: http://example.com/users/123\r\n"
-                    "\r\n";
-
-  std::cout << '\n';
-
-  auto r1 = my::http::Response::parse(res);
-  std::cout << "http: " << r1.get_http_ver() << '\n';
-  std::cout << "code: " << r1.get_code() << '\n';
-  std::cout << "text: " << r1.get_text() << '\n';
-  std::cout << "header: " << r1.get_header("Content-Type") << '\n';
-
-
-  std::string request = "GET /data/2.5/weather?lat=43.0147&lon=131.8642&appid= HTTP/1.1\r\n"
-                        "Host: api.openweathermap.org\r\n"
-                        "\r\n";
+  std::string request = ss.str();
 
   my::http::Client cl;
   cl.connect({"api.openweathermap.org"});
@@ -65,6 +44,25 @@ int main() {
   auto answer = cl.receive();
 
   std::cout << std::string(answer.dump().first.get(), answer.dump().second);
+
+  nlohmann::json js = nlohmann::json::parse(
+      std::string(answer.get_body().first.get(), answer.get_body().second));
+
+  std::cout << '\n' << std::endl;
+
+  float temp = js["main"]["temp"];
+  temp -= 273;
+
+  float feels_like = js["main"]["feels_like"];
+  feels_like -= 273;
+
+  float pressure = js["main"]["pressure"];
+  float humidity = js["main"]["humidity"];
+
+  std::cout << "temp: " << temp << '\n';
+  std::cout << "feels_like: " << feels_like << '\n';
+  std::cout << "pressure: " << pressure << '\n';
+  std::cout << "humidity: " << humidity << '\n';
 
   return 0;
 }
