@@ -430,6 +430,10 @@ my::http::Response my::http::Response::parse(const std::string &request) {
 // Client
 class my::http::Client::ClientImpl {
 public:
+  ~ClientImpl() {
+    close(socket);
+  }
+
   Adress addr;
   int socket;
   bool is_connected;
