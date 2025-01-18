@@ -5,16 +5,18 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <thread>
 
 int main(int argc, char **argv) {
-  if (argc < 4) {
-    std::cout << "Usage: [api_key] [lat] [lon]\n";
+  if (argc < 5) {
+    std::cout << "Usage: [port] [api_key] [lat] [lon]\n";
     return 0;
   }
 
-  std::string appid = argv[1];
-  std::string lat = argv[2];
-  std::string lon = argv[3];
+  std::string com = argv[1];
+  std::string appid = argv[2];
+  std::string lat = argv[3];
+  std::string lon = argv[4];
 
   std::stringstream ss;
   ss << "GET /data/2.5/weather?lat=" << lat << "&lon=" << lon
@@ -58,7 +60,7 @@ int main(int argc, char **argv) {
 
   std::cout << send_js.dump();
 
-  my::Serial port("/dev/pts/6");
+  my::Serial port(com);
 
   port.set_baudrate(my::Serial::BaudRate::BR_115200);
   port.set_parity(my::Serial::Parity::COM_PARITY_EVEN);
@@ -67,9 +69,9 @@ int main(int argc, char **argv) {
 
   port.setup();
 
-  port.flush();
-
   port << send_js.dump();
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
   return 0;
 }

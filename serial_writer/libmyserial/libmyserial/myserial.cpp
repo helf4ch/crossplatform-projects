@@ -9,6 +9,7 @@ class my::Serial::SerialImpl {
 public:
   ~SerialImpl() {
     if (is_open) {
+      tcflush(port, TCIOFLUSH);
       close(port);
     }
   }
@@ -121,6 +122,8 @@ void my::Serial::setup() {
   if (res) {
     throw my::common::Exception("Error in my::Serial::setup.", errno);
   }
+
+  flush();
 #endif
 }
 
@@ -128,17 +131,30 @@ int my::Serial::read(char *buf, size_t count) {
 #ifdef _WIN32
 
 #else
-  int res = ::read(serial->port, buf, count);
-  if (res < 0) {
-    throw my::common::Exception("Error in my::Serial::read.", errno);
-  }
+  int len;
+  ioctl(serial->port, FIONREAD, &len);
 
-  return res;
+  int readed = 0;
+  do {
+    int bytes = ::read(serial->port, (void *)(buf + readed), len - readed);
+
+    if (bytes < 0) {
+      throw my::common::Exception("Error in my::Serial::read.", errno);
+    }
+
+    if (bytes == 0) {
+      break;
+    }
+
+    readed += bytes;
+  } while (readed < count || readed < len);
+
+  return readed;
 #endif
 }
 
 int my::Serial::read(std::string &buf) {
-  buf.reserve(1024);
+  buf.resize(512);
   int res = read(buf.data(), buf.capacity());
   buf.resize(res);
   return res;
@@ -150,21 +166,25 @@ int my::Serial::write(const char *buf, size_t count) {
 #else
   int writed = 0;
   do {
-    int bytes = ::write(serial->port, buf, count);
+    int bytes = ::write(serial->port, (void *)(buf + writed), count - writed);
 
     if (bytes < 0) {
       throw my::common::Exception("Error in my::Serial::write.", errno);
     }
 
+    if (bytes == 0) {
+      break;
+    }
+
     writed += bytes;
-  } while (writed != count);
+  } while (writed < count);
 
   return writed;
 #endif
 }
 
 int my::Serial::write(const std::string &buf) {
-  int res = write(const_cast<char *>(buf.c_str()), buf.size());
+  int res = write(buf.c_str(), buf.size());
   return res;
 }
 

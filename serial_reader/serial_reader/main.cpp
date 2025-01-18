@@ -6,7 +6,14 @@
 #include <thread>
 
 int main(int argc, char **argv) {
-  my::Serial port("/dev/pts/7");
+  if (argc < 2) {
+    std::cout << "Usage: [port]\n";
+    return 0;
+  }
+
+  std::string com = argv[1];
+
+  my::Serial port(com);
 
   port.set_baudrate(my::Serial::BaudRate::BR_115200);
   port.set_parity(my::Serial::Parity::COM_PARITY_EVEN);
@@ -15,20 +22,15 @@ int main(int argc, char **argv) {
 
   port.setup();
 
-  port.flush();
-
   std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
   std::string buf;
   while (true) {
     int res = port.read(buf);
-    std::cout << "readed " << res << " size " << buf.size() << '\n';
+    std::cout << "readed " << res << " got " << buf.size() << " cap " << buf.capacity() << '\n';
     std::cout << buf;
-    // for (int i = 0; i < buf.size(); ++i) {
-    //   std::cout << i << ' ' << int(buf[i]) << '\n';
-    // }
     std::cout << '\n';
-    // std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }
 
   return 0;
