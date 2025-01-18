@@ -4,3 +4,4 @@ find_library(libmyhttp libmyhttp)
 
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE libmyhttp)
 target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC nlohmann_json::nlohmann_json)
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ws2_32)

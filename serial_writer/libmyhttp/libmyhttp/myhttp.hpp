@@ -1,13 +1,25 @@
 #pragma once
 
 #include <memory>
-#include <netinet/in.h>
 #include <string>
 #include <set>
+
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
+#pragma comment(lib,"ws2_32.lib")
+#else
+#include <sys/socket.h>
+#include <asm/termbits.h>
+#include <sys/ioctl.h>
+#include <arpa/inet.h>
 #include <netdb.h>
+#include <netinet/in.h>
+#endif
 
 namespace my::http {
-
+  
 class Adress {
 public:
 

@@ -3,25 +3,13 @@
 #include "libmycommon/mycommon.hpp"
 
 #include <algorithm>
-#include <arpa/inet.h>
 #include <cstddef>
 #include <cstring>
 #include <memory>
-#include <netdb.h>
-#include <netinet/in.h>
 #include <set>
 #include <sstream>
-#include <sys/socket.h>
 #include <unistd.h>
 #include <vector>
-
-#include <asm/termbits.h>
-#include <sys/ioctl.h>
-
-#include <arpa/inet.h>
-#include <netinet/in.h>
-
-#include <iostream>
 
 // my::http::Adress
 class my::http::Adress::AdressImpl {
@@ -50,9 +38,9 @@ my::http::Adress::Adress(const std::string &name, int port) {
   struct addrinfo hints;
 
   memset(&hints, 0, sizeof hints);
-  hints.ai_family = AF_INET;      
+  hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
-  hints.ai_flags = AI_PASSIVE;    
+  hints.ai_flags = AI_PASSIVE;
 
   status = getaddrinfo(name.c_str(), std::to_string(port).c_str(), &hints,
                        &adress->addr);
@@ -156,7 +144,7 @@ public:
   std::string http_ver = "HTTP/1.1";
   std::set<Param> params;
   std::set<Header> headers;
-  std::shared_ptr<char[]>body;
+  std::shared_ptr<char[]> body;
   int body_size = 0;
 };
 
@@ -222,7 +210,8 @@ void my::http::Request::set_body(const char *body, const int body_lenght) {
   request->body_size = body_lenght;
 }
 
-const std::pair<std::shared_ptr<char[]>, int> my::http::Request::get_body() const {
+const std::pair<std::shared_ptr<char[]>, int>
+my::http::Request::get_body() const {
   return {request->body, request->body_size};
 }
 
@@ -373,7 +362,8 @@ void my::http::Response::set_body(const char *body, const int body_lenght) {
   response->body_size = body_lenght;
 }
 
-const std::pair<std::shared_ptr<char[]>, int> my::http::Response::get_body() const {
+const std::pair<std::shared_ptr<char[]>, int>
+my::http::Response::get_body() const {
   return {response->body, response->body_size};
 }
 
@@ -430,12 +420,21 @@ my::http::Response my::http::Response::parse(const std::string &request) {
 // Client
 class my::http::Client::ClientImpl {
 public:
-  ~ClientImpl() {
-    close(socket);
+#ifdef _WIN32
+  ClientImpl() {
+    WSADATA wsaData;
+    WSAStartup(MAKEWORD(2, 2), &wsaData);
   }
+#endif
+
+  ~ClientImpl() { close(socket); }
 
   Adress addr;
+#ifdef _WIN32
+  SOCKET socket;
+#else
   int socket;
+#endif
   bool is_connected;
 };
 
@@ -461,7 +460,7 @@ void my::http::Client::send(const Request &req) {
 
   int sent = 0;
   do {
-    int bytes = write(client->socket, msg.get() + sent, size - sent);
+    int bytes = ::send(client->socket, msg.get() + sent, size - sent, 0);
 
     if (bytes < 0) {
       throw my::common::Exception("Error in my::http::Client::send.", errno);
@@ -482,7 +481,7 @@ my::http::Response my::http::Client::receive() {
   std::string end_of_read = "\r\n\r\n";
   int num_read = 1;
   while (true) {
-    int bytes = read(client->socket, buf + received, num_read);
+    int bytes = ::recv(client->socket, buf + received, num_read, 0);
 
     if (bytes < 0) {
       throw my::common::Exception("Error in my::http::Client::receive.", errno);
@@ -513,14 +512,19 @@ my::http::Response my::http::Client::receive() {
 
   delete[] buf;
 
+#ifdef _WIN32
+  u_long len = 0;
+  ioctlsocket(client->socket, FIONREAD, &len);
+#else
   int len = 0;
   ioctl(client->socket, FIONREAD, &len);
+#endif
 
   bufsize = 1024;
   buf = new char[bufsize]();
   received = 0;
   while (true) {
-    int bytes = read(client->socket, buf + received, len - received);
+    int bytes = ::recv(client->socket, buf + received, len - received, 0);
 
     if (bytes < 0) {
       throw my::common::Exception("Error in my::http::Client::receive.", errno);

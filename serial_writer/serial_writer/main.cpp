@@ -8,6 +8,7 @@
 #include "nlohmann/json_fwd.hpp"
 #include <iostream>
 #include <nlohmann/json.hpp>
+#include <sstream>
 
 int main(int argc, char **argv) {
   // auto d = open("/dev/pts/4", O_WRONLY);
