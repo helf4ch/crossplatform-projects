@@ -1,25 +1,12 @@
-// #include <cerrno>
-// #include <sys/types.h>
-// #include <unistd.h>
-// #include <sys/stat.h>
-// #include <fcntl.h>
-
 #include "libmyhttp/myhttp.hpp"
-#include "nlohmann/json_fwd.hpp"
-#include <iostream>
+#include "libmyserial/myserial.hpp"
 #include <nlohmann/json.hpp>
+
+#include <iostream>
 #include <sstream>
+#include <string>
 
 int main(int argc, char **argv) {
-  // auto d = open("/dev/pts/4", O_WRONLY);
-
-  // if (d == 0) {
-  //   std::cout << "error " << errno;
-  // }
-
-  // char buf[] = "hello\n";
-  // write(d, buf, 10);
-
   if (argc < 4) {
     std::cout << "Usage: [api_key] [lat] [lon]\n";
     return 0;
@@ -46,24 +33,43 @@ int main(int argc, char **argv) {
 
   std::cout << std::string(answer.dump().first.get(), answer.dump().second);
 
-  nlohmann::json js = nlohmann::json::parse(
+  nlohmann::json answer_js = nlohmann::json::parse(
       std::string(answer.get_body().first.get(), answer.get_body().second));
 
   std::cout << '\n' << std::endl;
 
-  float temp = js["main"]["temp"];
+  float temp = answer_js["main"]["temp"];
   temp -= 273;
 
-  float feels_like = js["main"]["feels_like"];
+  float pressure = answer_js["main"]["pressure"];
+  float humidity = answer_js["main"]["humidity"];
+  float wind_speed = answer_js["wind"]["speed"];
+
+  float feels_like = answer_js["main"]["feels_like"];
   feels_like -= 273;
 
-  float pressure = js["main"]["pressure"];
-  float humidity = js["main"]["humidity"];
+  nlohmann::json send_js;
 
-  std::cout << "temp: " << temp << '\n';
-  std::cout << "feels_like: " << feels_like << '\n';
-  std::cout << "pressure: " << pressure << '\n';
-  std::cout << "humidity: " << humidity << '\n';
+  send_js["temp"] = temp;
+  send_js["pressure"] = pressure;
+  send_js["humidity"] = humidity;
+  send_js["wind_speed"] = wind_speed;
+  send_js["feels_like"] = feels_like;
+
+  std::cout << send_js.dump();
+
+  my::Serial port("/dev/pts/6");
+
+  port.set_baudrate(my::Serial::BaudRate::BR_115200);
+  port.set_parity(my::Serial::Parity::COM_PARITY_EVEN);
+  port.set_bytesize(my::Serial::ByteSize::SIZE_8);
+  port.set_stopbit(my::Serial::StopBits::STOPBIT_ONE);
+
+  port.setup();
+
+  port.flush();
+
+  port << send_js.dump();
 
   return 0;
 }

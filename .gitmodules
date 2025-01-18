@@ -1,3 +1,6 @@
 [submodule "serial_writer/json"]
 	path = serial_writer/json
 	url = https://github.com/nlohmann/json.git
+[submodule "serial_reader/json"]
+	path = serial_reader/json
+	url = https://github.com/nlohmann/json.git
