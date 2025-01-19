@@ -11,7 +11,6 @@
 #pragma comment(lib,"ws2_32.lib")
 #else
 #include <sys/socket.h>
-// #include <asm/termbits.h>
 #include <sys/ioctl.h>
 #include <arpa/inet.h>
 #include <netdb.h>

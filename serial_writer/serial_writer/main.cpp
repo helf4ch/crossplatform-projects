@@ -2,22 +2,24 @@
 #include "libmyserial/myserial.hpp"
 #include <nlohmann/json.hpp>
 
+#include <chrono>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <thread>
 
-int main(int argc, char **argv) {
-  if (argc < 5) {
-    std::cout << "Usage: [port] [api_key] [lat] [lon]\n";
-    return 0;
-  }
+#define WRITE_TIME_MIN 3
 
-  std::string com = argv[1];
-  std::string appid = argv[2];
-  std::string lat = argv[3];
-  std::string lon = argv[4];
+std::string get_ctime_string() {
+  std::stringstream buffer;
+  std::time_t t = std::time(0);
+  std::tm *now = std::localtime(&t);
+  buffer << std::put_time(now, "%d.%m.%Y %H:%M:%S");
+  return buffer.str();
+}
 
+std::string get_data(const std::string &appid, const std::string &lat,
+                     const std::string &lon) {
   std::stringstream ss;
   ss << "GET /data/2.5/weather?lat=" << lat << "&lon=" << lon
      << "&appid=" << appid << " HTTP/1.1\r\n"
@@ -33,6 +35,7 @@ int main(int argc, char **argv) {
 
   auto answer = cl.receive();
 
+  std::cout << "Request result:\n";
   std::cout << std::string(answer.dump().first.get(), answer.dump().second);
 
   nlohmann::json answer_js = nlohmann::json::parse(
@@ -58,7 +61,19 @@ int main(int argc, char **argv) {
   send_js["wind_speed"] = wind_speed;
   send_js["feels_like"] = feels_like;
 
-  std::cout << send_js.dump();
+  return send_js.dump();
+}
+
+int main(int argc, char **argv) {
+  if (argc < 5) {
+    std::cout << "Usage: [port] [api_key] [lat] [lon]\n";
+    return 0;
+  }
+
+  std::string com = argv[1];
+  std::string appid = argv[2];
+  std::string lat = argv[3];
+  std::string lon = argv[4];
 
   my::Serial port(com);
 
@@ -66,12 +81,26 @@ int main(int argc, char **argv) {
   port.set_parity(my::Serial::Parity::COM_PARITY_EVEN);
   port.set_bytesize(my::Serial::ByteSize::SIZE_8);
   port.set_stopbit(my::Serial::StopBits::STOPBIT_ONE);
+  port.set_timeout(0);
 
   port.setup();
 
-  port << send_js.dump();
+  while (true) {
+    std::cout << "===============\n";
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    std::cout << "Wakeup at " << get_ctime_string() << "\n\n";
+
+    auto data = get_data(appid, lat, lon);
+
+    std::cout << "Writing to port:\n";
+    std::cout << data << '\n';
+
+    port << data << "\n";
+
+    std::cout << "===============\n\n";
+
+    std::this_thread::sleep_for(std::chrono::seconds(WRITE_TIME_MIN * 60));
+  }
 
   return 0;
 }

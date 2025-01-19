@@ -1,9 +1,20 @@
-// #include "libmyhttp/myhttp.hpp"
-// #include <nlohmann/json.hpp>
+#include "libmyhttp/myhttp.hpp"
+#include <nlohmann/json.hpp>
 #include "libmyserial/myserial.hpp"
 #include <chrono>
 #include <iostream>
 #include <thread>
+#include <sstream>
+
+#define READ_TIME_MIN 1
+
+std::string get_ctime_string() {
+  std::stringstream buffer;
+  std::time_t t = std::time(0);
+  std::tm *now = std::localtime(&t);
+  buffer << std::put_time(now, "%d.%m.%Y %H:%M:%S");
+  return buffer.str();
+}
 
 int main(int argc, char **argv) {
   if (argc < 2) {
@@ -23,15 +34,28 @@ int main(int argc, char **argv) {
 
   port.setup();
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-  std::string buf;
   while (true) {
+    std::this_thread::sleep_for(std::chrono::seconds(READ_TIME_MIN * 60));
+
+    std::cout << "===============\n";
+
+    std::cout << "Wakeup at " << get_ctime_string() << "\n\n";
+
+    std::string buf;
     int res = port.read(buf);
-    std::cout << "readed " << res << " got " << buf.size() << " cap " << buf.capacity() << '\n';
-    std::cout << buf;
-    std::cout << '\n';
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    if (res > 0) {
+      if (buf[res - 1] != '\n') {
+        std::cout << "read failed\n";
+        port.flush();
+      } else {
+        std::cout << "Readed from port:\n";
+        std::cout << buf;
+      }
+    } else {
+      std::cout << "Got nothing\n";
+    }
+
+    std::cout << "===============\n\n";
   }
 
   return 0;
