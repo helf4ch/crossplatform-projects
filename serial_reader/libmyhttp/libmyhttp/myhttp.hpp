@@ -1,27 +1,28 @@
 #pragma once
 
+#include <map>
 #include <memory>
-#include <string>
 #include <set>
+#include <string>
+#include <vector>
 
 #ifdef _WIN32
+#include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include <windows.h>
-#pragma comment(lib,"ws2_32.lib")
+#pragma comment(lib, "ws2_32.lib")
 #else
-#include <sys/socket.h>
-#include <sys/ioctl.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
 #endif
 
 namespace my::http {
-  
+
 class Adress {
 public:
-
   Adress();
 
   Adress(const std::string &name, int port = 80);
@@ -95,8 +96,8 @@ public:
   void set_adress(const Adress &addr);
   const Adress &get_adress() const;
 
-  void set_type(const std::string & type);
-  const std::string get_type() const;
+  void set_method(const std::string &method);
+  const std::string get_method() const;
 
   void set_url(const std::string &url);
   const std::string &get_url() const;
@@ -172,11 +173,9 @@ public:
 
   Connection(const socket_t socket);
 
-  Connection(const Adress &addr);
-
   ~Connection() = default;
 
-  socket_t get_socket();
+  socket_t get_socket() const;
 
 private:
   class ConnectionImpl;
@@ -184,19 +183,33 @@ private:
   std::shared_ptr<ConnectionImpl> conn;
 };
 
+class Http {
+public:
+  Http(const Connection &conn);
+
+  Http(const Adress &addr);
+
+  ~Http() = default;
+
+  void send(const Request &req) const;
+
+  Response receive() const;
+
+private:
+  class HttpImpl;
+
+  std::shared_ptr<HttpImpl> http;
+};
+
 class Client {
 public:
   Client(const Connection &conn);
 
-  Client(const Adress &addr);
-
   ~Client() = default;
 
-  // void connect(const Adress &addr);
+  void send(const Response &res) const;
 
-  void send(const Request &req);
-
-  Response receive();
+  Request receive() const;
 
 private:
   class ClientImpl;
@@ -204,20 +217,34 @@ private:
   std::shared_ptr<ClientImpl> client;
 };
 
+class AHandler {
+public:
+  virtual void operator()(const Client &client, const Request &request) = 0;
+};
+
+struct Configuration {
+  std::string url;
+  std::map<std::string, std::shared_ptr<AHandler>> method_to_handler;
+
+  friend bool operator<(const Configuration &lhs, const Configuration &rhs) {
+    return lhs.url < rhs.url;
+  }
+};
+
 class Server {
 public:
-  Server();
+  Server(const Adress &addr);
 
   ~Server() = default;
 
-  void bind(const Adress &addr);
+  void add_configuration(const Configuration &config);
 
-  void listen(int max_conn);
+  void handle() const;
 
 private:
   class ServerImpl;
 
-  std::shared_ptr<ServerImpl> server;  
+  std::shared_ptr<ServerImpl> server;
 };
 
 } // namespace my::http

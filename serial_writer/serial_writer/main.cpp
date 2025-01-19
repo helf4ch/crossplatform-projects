@@ -28,11 +28,11 @@ std::string get_data(const std::string &appid, const std::string &lat,
 
   std::string request = ss.str();
 
-  my::http::Client cl({"api.openweathermap.org"});
+  my::http::Http http({"api.openweathermap.org"});
 
-  cl.send(my::http::Request::parse(request));
+  http.send(my::http::Request::parse(request));
 
-  auto answer = cl.receive();
+  auto answer = http.receive();
 
   std::cout << "Request result:\n";
   std::cout << std::string(answer.dump().first.get(), answer.dump().second);

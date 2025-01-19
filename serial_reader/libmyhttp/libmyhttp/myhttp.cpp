@@ -5,9 +5,12 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
+#include <map>
 #include <memory>
 #include <set>
 #include <sstream>
+#include <stdexcept>
+#include <string>
 #include <unistd.h>
 #include <vector>
 
@@ -134,7 +137,7 @@ class my::http::Request::RequestImpl {
 public:
   std::unique_ptr<Adress> addr;
 
-  std::string type;
+  std::string method;
   std::string url;
   std::string http_ver = "HTTP/1.1";
   std::set<Param> params;
@@ -153,11 +156,13 @@ const my::http::Adress &my::http::Request::get_adress() const {
   return *request->addr;
 }
 
-void my::http::Request::set_type(const std::string &type) {
-  request->type = type;
+void my::http::Request::set_method(const std::string &method) {
+  request->method = method;
 }
 
-const std::string my::http::Request::get_type() const { return request->type; }
+const std::string my::http::Request::get_method() const {
+  return request->method;
+}
 
 void my::http::Request::set_url(const std::string &url) { request->url = url; }
 
@@ -213,7 +218,7 @@ my::http::Request::get_body() const {
 const std::pair<std::shared_ptr<char[]>, int> my::http::Request::dump() const {
   std::stringstream ss;
 
-  ss << request->type << ' ' << request->url << '?';
+  ss << request->method << ' ' << request->url << '?';
 
   for (auto &it : request->params) {
     ss << it << '&';
@@ -233,7 +238,7 @@ const std::pair<std::shared_ptr<char[]>, int> my::http::Request::dump() const {
   std::shared_ptr<char[]> ptr(new char[size]);
 
   memcpy(ptr.get(), msg.c_str(), msg.size());
-  memcpy(ptr.get() + msg.size() + 1, request->body.get(), request->body_size);
+  memcpy(ptr.get() + msg.size(), request->body.get(), request->body_size);
 
   return {ptr, size};
 }
@@ -262,7 +267,7 @@ my::http::Request my::http::Request::parse(const std::string &request) {
   std::string buf;
 
   ss >> buf;
-  req.set_type(buf);
+  req.set_method(buf);
 
   ss >> buf;
   auto url_split = split(buf, "?");
@@ -351,6 +356,7 @@ const std::set<my::http::Header> &my::http::Response::get_headers() const {
   return response->headers;
 }
 
+#include <iostream>
 void my::http::Response::set_body(const char *body, const int body_lenght) {
   response->body = std::shared_ptr<char[]>(new char[body_lenght]);
   memcpy(response->body.get(), body, body_lenght);
@@ -380,7 +386,7 @@ const std::pair<std::shared_ptr<char[]>, int> my::http::Response::dump() const {
   std::shared_ptr<char[]> ptr(new char[size]);
 
   memcpy(ptr.get(), msg.c_str(), msg.size());
-  memcpy(ptr.get() + msg.size() + 1, response->body.get(), response->body_size);
+  memcpy(ptr.get() + msg.size(), response->body.get(), response->body_size);
 
   return {ptr, size};
 }
@@ -399,7 +405,7 @@ my::http::Response my::http::Response::parse(const std::string &request) {
   ss >> buf;
   res.set_code(std::stoi(buf));
 
-  ss >> buf;
+  std::getline(ss, buf);
   res.set_text(buf);
 
   for (int i = 1; i < lines.size() - 2; ++i) {
@@ -412,20 +418,23 @@ my::http::Response my::http::Response::parse(const std::string &request) {
   return res;
 }
 
-bool WSA_IS_ACTIVE = false;
-
-class my::http::Connection::ConnectionImpl {
-public:
 #ifdef _WIN32
-  ConnectionImpl() {
-    if (!WSA_IS_ACTIVE) {
-      WSADATA wsaData;
-      WSAStartup(MAKEWORD(2, 2), &wsaData);
-      WSA_IS_ACTIVE = true;
-    }
+class _WSA_CLASS {
+public:
+  _WSA_CLASS() {
+    WSADATA wsaData;
+    WSAStartup(MAKEWORD(2, 2), &wsaData);
   }
+
+  ~_WSA_CLASS() { WSACleanup(); }
+};
+
+std::unique_ptr<_WSA_CLASS> _wsa = std::make_shared<_WSA_CLASS>();
 #endif
 
+// Connection
+class my::http::Connection::ConnectionImpl {
+public:
   ~ConnectionImpl() { close(socket); }
 
   socket_t socket;
@@ -434,6 +443,17 @@ public:
 my::http::Connection::Connection() {
   conn = std::make_shared<ConnectionImpl>();
   conn->socket = ::socket(AF_INET, SOCK_STREAM, 0);
+#ifdef _WIN32
+  if (conn->socket == INVALID_SOCKET) {
+    throw my::common::Exception("Error in my::http::Connection::Connection.",
+                                WSAGetLastError());
+  }
+#else
+  if (conn->socket == -1) {
+    throw my::common::Exception("Error in my::http::Connection::Connection.",
+                                errno);
+  }
+#endif
 }
 
 my::http::Connection::Connection(const socket_t socket) {
@@ -441,77 +461,39 @@ my::http::Connection::Connection(const socket_t socket) {
   conn->socket = socket;
 }
 
-my::http::Connection::Connection(const Adress &addr) {
-  conn = std::make_shared<ConnectionImpl>();
-
-  conn->socket = ::socket(AF_INET, SOCK_STREAM, 0);
-
-  int res = ::connect(conn->socket, addr.get_addr()->ai_addr,
-                      addr.get_addr()->ai_addrlen);
-  if (res) {
-    throw my::common::Exception("Error in my::http::Connection::Connection.",
-                                errno);
-  }
-}
-
-my::http::Connection::socket_t my::http::Connection::get_socket() {
+my::http::Connection::socket_t my::http::Connection::get_socket() const {
   return conn->socket;
 }
 
-// Client
-class my::http::Client::ClientImpl {
+// Http
+class my::http::Http::HttpImpl {
 public:
-#ifdef _WIN32
-  ClientImpl() {
-    if (!WSA_IS_ACTIVE) {
-      WSADATA wsaData;
-      WSAStartup(MAKEWORD(2, 2), &wsaData);
-      WSA_IS_ACTIVE = true;
-    }
-  }
-#endif
-
-  // ~ClientImpl() { close(socket); }
-
   Connection conn;
-  // Adress addr;
-  // #ifdef _WIN32
-  // SOCKET socket;
-  // #else
-  // int socket;
-  // #endif
-  // bool is_connected;
 };
 
-my::http::Client::Client(const Connection &conn) {
-  client = std::make_shared<ClientImpl>();
-  client->conn = conn;
+my::http::Http::Http(const Connection &conn) {
+  http = std::make_shared<HttpImpl>();
+  http->conn = conn;
 }
 
-my::http::Client::Client(const Adress &addr) {
-  client = std::make_shared<ClientImpl>();
-  client->conn = Connection(addr);
+my::http::Http::Http(const Adress &addr) {
+  http = std::make_shared<HttpImpl>();
+
+  int res = ::connect(http->conn.get_socket(), addr.get_addr()->ai_addr,
+                      addr.get_addr()->ai_addrlen);
+#ifdef _WIN32
+  if (res == SOCKET_ERROR) {
+    throw my::common::Exception("Error in my::http::Http::Http.",
+                                WSAGetLastError());
+  }
+#else
+  if (res) {
+    throw my::common::Exception("Error in my::http::Http::Http.", errno);
+  }
+#endif
 }
 
-// my::http::Client::Client() {
-//   client = std::make_shared<ClientImpl>();
-//   client->socket = ::socket(AF_INET, SOCK_STREAM, 0);
-//   client->is_connected = false;
-// }
-
-// void my::http::Client::connect(const Adress &addr) {
-//   int res = ::connect(client->socket, addr.get_addr()->ai_addr,
-//                       addr.get_addr()->ai_addrlen);
-
-//   if (res) {
-//     throw my::common::Exception("Error in my::http::Client::Connect.",
-//     errno);
-//   }
-
-//   client->is_connected = true;
-// }
-
-void my::http::Client::send(const Request &req) {
+void my::http::Http::send(const Request &req) const {
   auto dump = req.dump();
   auto msg = dump.first;
   auto size = dump.second;
@@ -519,11 +501,18 @@ void my::http::Client::send(const Request &req) {
   int sent = 0;
   do {
     int bytes =
-        ::send(client->conn.get_socket(), msg.get() + sent, size - sent, 0);
+        ::send(http->conn.get_socket(), msg.get() + sent, size - sent, 0);
 
-    if (bytes < 0) {
-      throw my::common::Exception("Error in my::http::Client::send.", errno);
+#ifdef _WIN32
+    if (bytes == SOCKET_ERROR) {
+      throw my::common::Exception("Error in my::http::Http::send.",
+                                  WSAGetLastError());
     }
+#else
+    if (bytes < 0) {
+      throw my::common::Exception("Error in my::http::Http::send.", errno);
+    }
+#endif
 
     if (bytes == 0) {
       break;
@@ -533,18 +522,25 @@ void my::http::Client::send(const Request &req) {
   } while (sent < size);
 }
 
-my::http::Response my::http::Client::receive() {
+my::http::Response my::http::Http::receive() const {
   int bufsize = 1024;
   char *buf = new char[bufsize]();
   int received = 0;
   std::string end_of_read = "\r\n\r\n";
   int num_read = 1;
   while (true) {
-    int bytes = ::recv(client->conn.get_socket(), buf + received, num_read, 0);
+    int bytes = ::recv(http->conn.get_socket(), buf + received, num_read, 0);
 
-    if (bytes < 0) {
-      throw my::common::Exception("Error in my::http::Client::receive.", errno);
+#ifdef _WIN32
+    if (bytes == SOCKET_ERROR) {
+      throw my::common::Exception("Error in my::http::Http::receive.",
+                                  WSAGetLastError());
     }
+#else
+    if (bytes < 0) {
+      throw my::common::Exception("Error in my::http::Http::receive.", errno);
+    }
+#endif
 
     received += num_read;
 
@@ -573,22 +569,33 @@ my::http::Response my::http::Client::receive() {
 
 #ifdef _WIN32
   u_long len = 0;
-  ioctlsocket(client->conn.get_socket(), FIONREAD, &len);
+  ioctlsocket(http->conn.get_socket(), FIONREAD, &len);
 #else
   int len = 0;
-  ioctl(client->conn.get_socket(), FIONREAD, &len);
+  ioctl(http->conn.get_socket(), FIONREAD, &len);
 #endif
+
+  if (len == 0) {
+    return res;
+  }
 
   bufsize = 1024;
   buf = new char[bufsize]();
   received = 0;
   while (true) {
     int bytes =
-        ::recv(client->conn.get_socket(), buf + received, len - received, 0);
+        ::recv(http->conn.get_socket(), buf + received, len - received, 0);
 
-    if (bytes < 0) {
-      throw my::common::Exception("Error in my::http::Client::receive.", errno);
+#ifdef _WIN32
+    if (bytes == SOCKET_ERROR) {
+      throw my::common::Exception("Error in my::http::Http::receive.",
+                                  WSAGetLastError());
     }
+#else
+    if (bytes < 0) {
+      throw my::common::Exception("Error in my::http::Http::receive.", errno);
+    }
+#endif
 
     received += bytes;
 
@@ -609,4 +616,262 @@ my::http::Response my::http::Client::receive() {
   res.set_body(buf, received + 1);
 
   return res;
+}
+
+// Client
+class my::http::Client::ClientImpl {
+public:
+  Connection conn;
+};
+
+my::http::Client::Client(const Connection &conn) {
+  client = std::make_shared<ClientImpl>();
+  client->conn = conn;
+}
+
+void my::http::Client::send(const Response &res) const {
+  auto dump = res.dump();
+  auto msg = dump.first;
+  auto size = dump.second;
+
+  std::cout << std::string(msg.get(), size) << '\n';
+  std::cout << "size " << size << '\n';
+
+  int sent = 0;
+  do {
+    int bytes =
+        ::send(client->conn.get_socket(), msg.get() + sent, size - sent, 0);
+
+#ifdef _WIN32
+    if (bytes == SOCKET_ERROR) {
+      throw my::common::Exception("Error in my::http::Client::send.",
+                                  WSAGetLastError());
+    }
+#else
+    if (bytes < 0) {
+      throw my::common::Exception("Error in my::http::Client::send.", errno);
+    }
+#endif
+
+    if (bytes == 0) {
+      break;
+    }
+
+    sent += bytes;
+  } while (sent < size);
+}
+
+my::http::Request my::http::Client::receive() const {
+  int bufsize = 1024;
+  char *buf = new char[bufsize]();
+  int received = 0;
+  std::string end_of_read = "\r\n\r\n";
+  int num_read = 1;
+  while (true) {
+    int bytes = ::recv(client->conn.get_socket(), buf + received, num_read, 0);
+
+#ifdef _WIN32
+    if (bytes == SOCKET_ERROR) {
+      throw my::common::Exception("Error in my::http::Client::receive.",
+                                  WSAGetLastError());
+    }
+#else
+    if (bytes < 0) {
+      throw my::common::Exception("Error in my::http::Client::receive.", errno);
+    }
+#endif
+
+    received += num_read;
+
+    if (bytes == 0) {
+      break;
+    }
+
+    char *end_pos = strstr(buf, end_of_read.c_str());
+    if (end_pos != NULL) {
+      break;
+    }
+
+    if (received == bufsize) {
+      int new_bufsize = bufsize * 2;
+      char *new_buf = new char[new_bufsize]();
+      strcpy(new_buf, buf);
+      delete[] buf;
+      bufsize = new_bufsize;
+      buf = new_buf;
+    }
+  }
+
+  auto req = Request::parse(buf);
+
+  delete[] buf;
+
+#ifdef _WIN32
+  u_long len = 0;
+  ioctlsocket(client->conn.get_socket(), FIONREAD, &len);
+#else
+  int len = 0;
+  ioctl(client->conn.get_socket(), FIONREAD, &len);
+#endif
+
+  if (len == 0) {
+    return req;
+  }
+
+  bufsize = 1024;
+  buf = new char[bufsize]();
+  received = 0;
+  while (true) {
+    int bytes =
+        ::recv(client->conn.get_socket(), buf + received, len - received, 0);
+
+#ifdef _WIN32
+    if (bytes == SOCKET_ERROR) {
+      throw my::common::Exception("Error in my::http::Client::receive.",
+                                  WSAGetLastError());
+    }
+#else
+    if (bytes < 0) {
+      throw my::common::Exception("Error in my::http::Client::receive.", errno);
+    }
+#endif
+
+    received += bytes;
+
+    if (bytes == 0 || received == len) {
+      break;
+    }
+
+    if (received == bufsize) {
+      int new_bufsize = bufsize * 2;
+      char *new_buf = new char[new_bufsize]();
+      strcpy(new_buf, buf);
+      delete[] buf;
+      bufsize = new_bufsize;
+      buf = new_buf;
+    }
+  }
+
+  req.set_body(buf, received + 1);
+
+  return req;
+}
+
+class Default404 : public my::http::AHandler {
+public:
+  void operator()(const my::http::Client &client,
+                  const my::http::Request &request) {
+    std::string answer = "HTTP/1.1 404 Not Found\r\n"
+                         "Content-Type: text/plain\r\n"
+                         "Content-Lenght: 13\r\n"
+                         "\r\n";
+    std::string body = "404 Not Found";
+
+    auto response = my::http::Response::parse(answer);
+    response.set_body(body.c_str(), body.size()); 
+
+    client.send(response);
+  }
+};
+
+class Default405 : public my::http::AHandler {
+public:
+  void operator()(const my::http::Client &client,
+                  const my::http::Request &request) {
+    std::string answer = "HTTP/1.1 405 Not Found\r\n"
+                         "Content-Type: text/plain\r\n"
+                         "Content-Lenght: 23\r\n"
+                         "\r\n";
+
+    std::string body = "405 Method Not Allowed";
+
+    auto response = my::http::Response::parse(answer);
+    response.set_body(body.c_str(), body.size()); 
+
+    client.send(response);
+  }
+};
+
+// Server
+class my::http::Server::ServerImpl {
+public:
+  Connection conn;
+  std::map<std::string, Configuration> url_to_config;
+};
+
+my::http::Server::Server(const Adress &addr) {
+  server = std::make_shared<ServerImpl>();
+
+  int res = ::bind(server->conn.get_socket(), addr.get_addr()->ai_addr,
+                   addr.get_addr()->ai_addrlen);
+#ifdef _WIN32
+  if (res == SOCKET_ERROR) {
+    throw my::common::Exception("Error in my::http::Server::Server.",
+                                WSAGetLastError());
+  }
+#else
+  if (res) {
+    throw my::common::Exception("Error in my::http::Server::Server.", errno);
+  }
+#endif
+}
+
+void my::http::Server::add_configuration(const Configuration &config) {
+  server->url_to_config[config.url] = config;
+}
+
+void my::http::Server::handle() const {
+  int res = ::listen(server->conn.get_socket(), 5);
+#ifdef _WIN32
+  if (res == SOCKET_ERROR) {
+    throw my::common::Exception("Error in my::http::Server::handle.",
+                                WSAGetLastError());
+  }
+#else
+  if (res) {
+    throw my::common::Exception("Error in my::http::Server::handle.", errno);
+  }
+#endif
+
+  while (true) {
+    Connection::socket_t sock =
+        ::accept(server->conn.get_socket(), nullptr, nullptr);
+#ifdef _WIN32
+    if (sock == INVALID_SOCKET) {
+      throw my::common::Exception("Error in my::http::Server::handle.",
+                                  WSAGetLastError());
+    }
+#else
+    if (sock == -1) {
+      throw my::common::Exception("Error in my::http::Server::handle.", errno);
+    }
+#endif
+
+    std::cout << "got sock\n";
+
+    Client client(Connection{sock});
+    auto request = client.receive();
+
+    std::string url = request.get_url();
+    std::string method = request.get_method();
+
+    std::cout << "parsed\n";
+    Configuration config;
+    try {
+      config = server->url_to_config.at(url);
+    } catch (std::out_of_range) {
+      Default404()(client, request);
+      continue;
+    }
+
+    std::shared_ptr<AHandler> handler;
+    try {
+      handler = config.method_to_handler.at(method);
+    } catch (std::out_of_range) {
+      Default405()(client, request);
+      continue;
+    }
+
+    (*handler)(client, request);
+  }
 }
