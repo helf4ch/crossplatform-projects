@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
     std::cout << "readed " << res << " got " << buf.size() << " cap " << buf.capacity() << '\n';
     std::cout << buf;
     std::cout << '\n';
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   }
 
   return 0;

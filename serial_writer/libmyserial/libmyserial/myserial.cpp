@@ -8,10 +8,14 @@
 class my::Serial::SerialImpl {
 public:
   ~SerialImpl() {
+#ifdef _WIN32
+
+#else
     if (is_open) {
       tcflush(port, TCIOFLUSH);
       close(port);
     }
+#endif
   }
 
 #ifdef _WIN32
@@ -32,6 +36,7 @@ public:
   Parity parity;
   StopBits stopbit;
   ByteSize bytesize;
+  size_t timeout = 0;
 };
 
 my::Serial::Serial(const std::string &name) {
@@ -106,12 +111,24 @@ my::Serial::ByteSize my::Serial::get_bytesize() const {
   return serial->bytesize;
 }
 
+void my::Serial::set_timeout(size_t millisec) {
+  serial->timeout = millisec;
+#ifdef _WIN32
+
+#else
+  serial->settings.c_cc[VTIME] = serial->timeout;
+#endif
+}
+
+size_t my::Serial::get_timeout() const {
+  return serial->timeout;
+}
+
 void my::Serial::setup() {
 #ifdef _WIN32
 
 #else
-  serial->settings.c_cc[VMIN] = 1;
-  serial->settings.c_cc[VTIME] = 10;
+  serial->settings.c_cc[VMIN] = 0;
   serial->settings.c_cflag &= ~CRTSCTS;
   serial->settings.c_cflag |= CLOCAL | CREAD;
   serial->settings.c_iflag &= ~(IXON | IXOFF | IXANY);
@@ -131,12 +148,9 @@ int my::Serial::read(char *buf, size_t count) {
 #ifdef _WIN32
 
 #else
-  int len;
-  ioctl(serial->port, FIONREAD, &len);
-
   int readed = 0;
   do {
-    int bytes = ::read(serial->port, (void *)(buf + readed), len - readed);
+    int bytes = ::read(serial->port, buf + readed, count - readed);
 
     if (bytes < 0) {
       throw my::common::Exception("Error in my::Serial::read.", errno);
@@ -147,7 +161,7 @@ int my::Serial::read(char *buf, size_t count) {
     }
 
     readed += bytes;
-  } while (readed < count || readed < len);
+  } while (readed < count);
 
   return readed;
 #endif
@@ -166,7 +180,7 @@ int my::Serial::write(const char *buf, size_t count) {
 #else
   int writed = 0;
   do {
-    int bytes = ::write(serial->port, (void *)(buf + writed), count - writed);
+    int bytes = ::write(serial->port, buf + writed, count - writed);
 
     if (bytes < 0) {
       throw my::common::Exception("Error in my::Serial::write.", errno);

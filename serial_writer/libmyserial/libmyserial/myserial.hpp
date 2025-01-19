@@ -85,6 +85,9 @@ public:
   void set_bytesize(ByteSize param);
   ByteSize get_bytesize() const;
 
+  void set_timeout(size_t millisec);
+  size_t get_timeout() const;
+
   void setup();
 
   int read(char *buf, size_t count);
