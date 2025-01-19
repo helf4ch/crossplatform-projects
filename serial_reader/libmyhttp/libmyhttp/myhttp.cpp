@@ -429,7 +429,7 @@ public:
   ~_WSA_CLASS() { WSACleanup(); }
 };
 
-std::unique_ptr<_WSA_CLASS> _wsa = std::make_shared<_WSA_CLASS>();
+std::unique_ptr<_WSA_CLASS> _wsa = std::make_unique<_WSA_CLASS>();
 #endif
 
 // Connection
