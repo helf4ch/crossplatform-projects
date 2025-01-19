@@ -28,8 +28,7 @@ std::string get_data(const std::string &appid, const std::string &lat,
 
   std::string request = ss.str();
 
-  my::http::Client cl;
-  cl.connect({"api.openweathermap.org"});
+  my::http::Client cl({"api.openweathermap.org"});
 
   cl.send(my::http::Request::parse(request));
 

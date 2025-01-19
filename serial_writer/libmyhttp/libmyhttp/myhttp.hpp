@@ -162,12 +162,21 @@ private:
 
 class Connection {
 public:
+#ifdef _WIN32
+  typedef SOCKET socket_t;
+#else
+  typedef int socket_t;
+#endif
+
   Connection();
+
+  Connection(const socket_t socket);
+
+  Connection(const Adress &addr);
 
   ~Connection() = default;
 
-  int get_socket();
-
+  socket_t get_socket();
 
 private:
   class ConnectionImpl;
@@ -177,11 +186,13 @@ private:
 
 class Client {
 public:
-  Client();
+  Client(const Connection &conn);
+
+  Client(const Adress &addr);
 
   ~Client() = default;
 
-  void connect(const Adress &addr);
+  // void connect(const Adress &addr);
 
   void send(const Request &req);
 
@@ -193,6 +204,20 @@ private:
   std::shared_ptr<ClientImpl> client;
 };
 
-class Server {};
+class Server {
+public:
+  Server();
+
+  ~Server() = default;
+
+  void bind(const Adress &addr);
+
+  void listen(int max_conn);
+
+private:
+  class ServerImpl;
+
+  std::shared_ptr<ServerImpl> server;  
+};
 
 } // namespace my::http

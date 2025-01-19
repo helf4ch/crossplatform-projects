@@ -21,9 +21,7 @@ public:
   struct addrinfo *addr;
 };
 
-my::http::Adress::Adress() {
-  adress = std::make_shared<AdressImpl>();
-}
+my::http::Adress::Adress() { adress = std::make_shared<AdressImpl>(); }
 
 my::http::Adress::Adress(const std::string &name, int port) {
   adress = std::make_shared<AdressImpl>();
@@ -414,43 +412,104 @@ my::http::Response my::http::Response::parse(const std::string &request) {
   return res;
 }
 
+bool WSA_IS_ACTIVE = false;
+
+class my::http::Connection::ConnectionImpl {
+public:
+#ifdef _WIN32
+  ConnectionImpl() {
+    if (!WSA_IS_ACTIVE) {
+      WSADATA wsaData;
+      WSAStartup(MAKEWORD(2, 2), &wsaData);
+      WSA_IS_ACTIVE = true;
+    }
+  }
+#endif
+
+  ~ConnectionImpl() { close(socket); }
+
+  socket_t socket;
+};
+
+my::http::Connection::Connection() {
+  conn = std::make_shared<ConnectionImpl>();
+  conn->socket = ::socket(AF_INET, SOCK_STREAM, 0);
+}
+
+my::http::Connection::Connection(const socket_t socket) {
+  conn = std::make_shared<ConnectionImpl>();
+  conn->socket = socket;
+}
+
+my::http::Connection::Connection(const Adress &addr) {
+  conn = std::make_shared<ConnectionImpl>();
+
+  conn->socket = ::socket(AF_INET, SOCK_STREAM, 0);
+
+  int res = ::connect(conn->socket, addr.get_addr()->ai_addr,
+                      addr.get_addr()->ai_addrlen);
+  if (res) {
+    throw my::common::Exception("Error in my::http::Connection::Connection.",
+                                errno);
+  }
+}
+
+my::http::Connection::socket_t my::http::Connection::get_socket() {
+  return conn->socket;
+}
+
 // Client
 class my::http::Client::ClientImpl {
 public:
 #ifdef _WIN32
   ClientImpl() {
-    WSADATA wsaData;
-    WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (!WSA_IS_ACTIVE) {
+      WSADATA wsaData;
+      WSAStartup(MAKEWORD(2, 2), &wsaData);
+      WSA_IS_ACTIVE = true;
+    }
   }
 #endif
 
-  ~ClientImpl() { close(socket); }
+  // ~ClientImpl() { close(socket); }
 
-  Adress addr;
-#ifdef _WIN32
-  SOCKET socket;
-#else
-  int socket;
-#endif
-  bool is_connected;
+  Connection conn;
+  // Adress addr;
+  // #ifdef _WIN32
+  // SOCKET socket;
+  // #else
+  // int socket;
+  // #endif
+  // bool is_connected;
 };
 
-my::http::Client::Client() {
+my::http::Client::Client(const Connection &conn) {
   client = std::make_shared<ClientImpl>();
-  client->socket = ::socket(AF_INET, SOCK_STREAM, 0);
-  client->is_connected = false;
+  client->conn = conn;
 }
 
-void my::http::Client::connect(const Adress &addr) {
-  int res = ::connect(client->socket, addr.get_addr()->ai_addr,
-                      addr.get_addr()->ai_addrlen);
-
-  if (res) {
-    throw my::common::Exception("Error in my::http::Client::Connect.", errno);
-  }
-
-  client->is_connected = true;
+my::http::Client::Client(const Adress &addr) {
+  client = std::make_shared<ClientImpl>();
+  client->conn = Connection(addr);
 }
+
+// my::http::Client::Client() {
+//   client = std::make_shared<ClientImpl>();
+//   client->socket = ::socket(AF_INET, SOCK_STREAM, 0);
+//   client->is_connected = false;
+// }
+
+// void my::http::Client::connect(const Adress &addr) {
+//   int res = ::connect(client->socket, addr.get_addr()->ai_addr,
+//                       addr.get_addr()->ai_addrlen);
+
+//   if (res) {
+//     throw my::common::Exception("Error in my::http::Client::Connect.",
+//     errno);
+//   }
+
+//   client->is_connected = true;
+// }
 
 void my::http::Client::send(const Request &req) {
   auto dump = req.dump();
@@ -459,7 +518,8 @@ void my::http::Client::send(const Request &req) {
 
   int sent = 0;
   do {
-    int bytes = ::send(client->socket, msg.get() + sent, size - sent, 0);
+    int bytes =
+        ::send(client->conn.get_socket(), msg.get() + sent, size - sent, 0);
 
     if (bytes < 0) {
       throw my::common::Exception("Error in my::http::Client::send.", errno);
@@ -480,7 +540,7 @@ my::http::Response my::http::Client::receive() {
   std::string end_of_read = "\r\n\r\n";
   int num_read = 1;
   while (true) {
-    int bytes = ::recv(client->socket, buf + received, num_read, 0);
+    int bytes = ::recv(client->conn.get_socket(), buf + received, num_read, 0);
 
     if (bytes < 0) {
       throw my::common::Exception("Error in my::http::Client::receive.", errno);
@@ -513,17 +573,18 @@ my::http::Response my::http::Client::receive() {
 
 #ifdef _WIN32
   u_long len = 0;
-  ioctlsocket(client->socket, FIONREAD, &len);
+  ioctlsocket(client->conn.get_socket(), FIONREAD, &len);
 #else
   int len = 0;
-  ioctl(client->socket, FIONREAD, &len);
+  ioctl(client->conn.get_socket(), FIONREAD, &len);
 #endif
 
   bufsize = 1024;
   buf = new char[bufsize]();
   received = 0;
   while (true) {
-    int bytes = ::recv(client->socket, buf + received, len - received, 0);
+    int bytes =
+        ::recv(client->conn.get_socket(), buf + received, len - received, 0);
 
     if (bytes < 0) {
       throw my::common::Exception("Error in my::http::Client::receive.", errno);
