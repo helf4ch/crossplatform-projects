@@ -101,14 +101,14 @@ public:
   const std::string &get_url() const;
 
   void add_param(const Param &param);
-  Param &get_param(const std::string &key);
+  Param &get_param(const std::string &key) const;
   const std::set<Param> &get_params() const;
 
   void set_http_ver(const std::string &ver);
   const std::string &get_http_ver() const;
 
   void add_header(const Header &header);
-  Header &get_header(const std::string key);
+  Header &get_header(const std::string key) const;
   const std::set<Header> &get_headers() const;
 
   void set_body(const char *body, const int body_lenght);
@@ -143,7 +143,7 @@ public:
   const std::string &get_text() const;
 
   void add_header(const Header &header);
-  Header &get_header(const std::string key);
+  Header &get_header(const std::string key) const;
   const std::set<Header> &get_headers() const;
 
   void set_body(const char *body, const int body_lenght);

@@ -170,10 +170,15 @@ void my::http::Request::add_param(const Param &param) {
   request->params.insert(param);
 }
 
-my::http::Param &my::http::Request::get_param(const std::string &key) {
-  return const_cast<Param &>(
-      *std::find_if(request->params.begin(), request->params.end(),
-                    [key](auto &it) { return it.get_key() == key; }));
+my::http::Param &my::http::Request::get_param(const std::string &key) const {
+  auto it = std::find_if(request->params.begin(), request->params.end(),
+                    [key](auto &it) { return it.get_key() == key; });
+
+  if (it == request->params.end()) {
+    throw std::out_of_range("No such param.");
+  }
+
+  return const_cast<Param &>(*it);
 }
 
 const std::set<my::http::Param> &my::http::Request::get_params() const {
@@ -190,10 +195,15 @@ const std::string &my::http::Request::get_http_ver() const {
   return request->http_ver;
 }
 
-my::http::Header &my::http::Request::get_header(const std::string key) {
-  return const_cast<Header &>(
-      *std::find_if(request->headers.begin(), request->headers.end(),
-                    [key](auto &it) { return it.get_key() == key; }));
+my::http::Header &my::http::Request::get_header(const std::string key) const {
+  auto it = std::find_if(request->headers.begin(), request->headers.end(),
+                    [key](auto &it) { return it.get_key() == key; });
+
+  if (it == request->headers.end()) {
+    throw std::out_of_range("No such param.");
+  }
+
+  return const_cast<Header &>(*it);
 }
 
 void my::http::Request::add_header(const Header &header) {
@@ -346,17 +356,21 @@ void my::http::Response::add_header(const Header &header) {
   response->headers.insert(header);
 }
 
-my::http::Header &my::http::Response::get_header(const std::string key) {
-  return const_cast<Header &>(
-      *std::find_if(response->headers.begin(), response->headers.end(),
-                    [key](auto &it) { return it.get_key() == key; }));
+my::http::Header &my::http::Response::get_header(const std::string key) const {
+  auto it = std::find_if(response->headers.begin(), response->headers.end(),
+                    [key](auto &it) { return it.get_key() == key; });
+
+  if (it == response->headers.end()) {
+    throw std::out_of_range("No such param.");
+  }
+
+  return const_cast<Header &>(*it);
 }
 
 const std::set<my::http::Header> &my::http::Response::get_headers() const {
   return response->headers;
 }
 
-#include <iostream>
 void my::http::Response::set_body(const char *body, const int body_lenght) {
   response->body = std::shared_ptr<char[]>(new char[body_lenght]);
   memcpy(response->body.get(), body, body_lenght);
@@ -634,9 +648,6 @@ void my::http::Client::send(const Response &res) const {
   auto msg = dump.first;
   auto size = dump.second;
 
-  std::cout << std::string(msg.get(), size) << '\n';
-  std::cout << "size " << size << '\n';
-
   int sent = 0;
   do {
     int bytes =
@@ -847,15 +858,12 @@ void my::http::Server::handle() const {
     }
 #endif
 
-    std::cout << "got sock\n";
-
     Client client(Connection{sock});
     auto request = client.receive();
 
     std::string url = request.get_url();
     std::string method = request.get_method();
 
-    std::cout << "parsed\n";
     Configuration config;
     try {
       config = server->url_to_config.at(url);
