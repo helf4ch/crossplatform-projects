@@ -18,6 +18,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang|GNU")
   )
 endif()
 
+find_package(SQLite3 REQUIRED)
+
 add_subdirectory(json/)
 add_subdirectory(libmycommon/)
 add_subdirectory(libmyhttp/)

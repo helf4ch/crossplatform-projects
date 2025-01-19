@@ -8,7 +8,7 @@
 #include <string>
 #include <thread>
 
-#define WRITE_TIME_MIN 3
+#define WRITE_TIME_MIN 20
 
 std::string get_ctime_string() {
   std::stringstream buffer;
@@ -45,8 +45,9 @@ std::string get_data(const std::string &appid, const std::string &lat,
   float temp = answer_js["main"]["temp"];
   temp -= 273;
 
-  float pressure = answer_js["main"]["pressure"];
-  float humidity = answer_js["main"]["humidity"];
+  int pressure = answer_js["main"]["pressure"];
+  int humidity = answer_js["main"]["humidity"];
+
   float wind_speed = answer_js["wind"]["speed"];
 
   float feels_like = answer_js["main"]["feels_like"];
@@ -54,7 +55,7 @@ std::string get_data(const std::string &appid, const std::string &lat,
 
   nlohmann::json send_js;
 
-  send_js["temp"] = temp;
+  send_js["temperature"] = temp;
   send_js["pressure"] = pressure;
   send_js["humidity"] = humidity;
   send_js["wind_speed"] = wind_speed;

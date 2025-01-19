@@ -6,6 +6,7 @@ find_library(libmyserial libmyserial)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE libmyhttp)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE libmyserial)
 target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC nlohmann_json::nlohmann_json)
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE SQLite::SQLite3)
 
 if (WIN32)
   target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ws2_32)
