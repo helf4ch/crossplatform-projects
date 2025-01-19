@@ -19,6 +19,7 @@ int main(int argc, char **argv) {
   port.set_parity(my::Serial::Parity::COM_PARITY_EVEN);
   port.set_bytesize(my::Serial::ByteSize::SIZE_8);
   port.set_stopbit(my::Serial::StopBits::STOPBIT_ONE);
+  port.set_timeout(0);
 
   port.setup();
 
