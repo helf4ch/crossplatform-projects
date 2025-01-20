@@ -172,7 +172,7 @@ void my::http::Request::add_param(const Param &param) {
 
 my::http::Param &my::http::Request::get_param(const std::string &key) const {
   auto it = std::find_if(request->params.begin(), request->params.end(),
-                    [key](auto &it) { return it.get_key() == key; });
+                         [key](auto &it) { return it.get_key() == key; });
 
   if (it == request->params.end()) {
     throw std::out_of_range("No such param.");
@@ -197,7 +197,7 @@ const std::string &my::http::Request::get_http_ver() const {
 
 my::http::Header &my::http::Request::get_header(const std::string key) const {
   auto it = std::find_if(request->headers.begin(), request->headers.end(),
-                    [key](auto &it) { return it.get_key() == key; });
+                         [key](auto &it) { return it.get_key() == key; });
 
   if (it == request->headers.end()) {
     throw std::out_of_range("No such param.");
@@ -358,7 +358,7 @@ void my::http::Response::add_header(const Header &header) {
 
 my::http::Header &my::http::Response::get_header(const std::string key) const {
   auto it = std::find_if(response->headers.begin(), response->headers.end(),
-                    [key](auto &it) { return it.get_key() == key; });
+                         [key](auto &it) { return it.get_key() == key; });
 
   if (it == response->headers.end()) {
     throw std::out_of_range("No such param.");
@@ -779,7 +779,7 @@ public:
     std::string body = "404 Not Found";
 
     auto response = my::http::Response::parse(answer);
-    response.set_body(body.c_str(), body.size()); 
+    response.set_body(body.c_str(), body.size());
 
     client.send(response);
   }
@@ -797,7 +797,7 @@ public:
     std::string body = "405 Method Not Allowed";
 
     auto response = my::http::Response::parse(answer);
-    response.set_body(body.c_str(), body.size()); 
+    response.set_body(body.c_str(), body.size());
 
     client.send(response);
   }
@@ -825,14 +825,8 @@ my::http::Server::Server(const Adress &addr) {
     throw my::common::Exception("Error in my::http::Server::Server.", errno);
   }
 #endif
-}
 
-void my::http::Server::add_configuration(const Configuration &config) {
-  server->url_to_config[config.url] = config;
-}
-
-void my::http::Server::handle() const {
-  int res = ::listen(server->conn.get_socket(), 5);
+  res = ::listen(server->conn.get_socket(), 5);
 #ifdef _WIN32
   if (res == SOCKET_ERROR) {
     throw my::common::Exception("Error in my::http::Server::handle.",
@@ -843,7 +837,13 @@ void my::http::Server::handle() const {
     throw my::common::Exception("Error in my::http::Server::handle.", errno);
   }
 #endif
+}
 
+void my::http::Server::add_configuration(const Configuration &config) {
+  server->url_to_config[config.url] = config;
+}
+
+void my::http::Server::handle() const {
   while (true) {
     Connection::socket_t sock =
         ::accept(server->conn.get_socket(), nullptr, nullptr);
