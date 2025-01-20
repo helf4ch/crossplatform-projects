@@ -71,6 +71,8 @@ public:
     connect(updateButton, &QPushButton::clicked, this, &WeatherApp::fetchData);
     connect(networkManager, &QNetworkAccessManager::finished, this,
             &WeatherApp::handleReply);
+
+    fetchData();
   }
 
 private slots:
