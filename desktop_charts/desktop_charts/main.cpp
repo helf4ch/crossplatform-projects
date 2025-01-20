@@ -16,12 +16,15 @@
 #include <QtCharts/QDateTimeAxis>
 #include <QtCharts/QLineSeries>
 #include <QtCharts/QValueAxis>
+#include <QNetworkProxyFactory>
 
 class WeatherApp : public QMainWindow {
   Q_OBJECT
 
 public:
   WeatherApp(QWidget *parent = nullptr) : QMainWindow(parent) {
+    QNetworkProxyFactory::setUseSystemConfiguration(true);
+    
     QWidget *centralWidget = new QWidget(this);
     QVBoxLayout *mainLayout = new QVBoxLayout(centralWidget);
 

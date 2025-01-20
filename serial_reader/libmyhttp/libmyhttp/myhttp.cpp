@@ -449,7 +449,13 @@ std::unique_ptr<_WSA_CLASS> _wsa = std::make_unique<_WSA_CLASS>();
 // Connection
 class my::http::Connection::ConnectionImpl {
 public:
-  ~ConnectionImpl() { close(socket); }
+  ~ConnectionImpl() {
+#ifdef _WIN32
+  closesocket(socket);
+#else
+  close(socket);
+#endif
+  }
 
   socket_t socket;
 };
