@@ -18,7 +18,11 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang|GNU")
   )
 endif()
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
+
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network Charts)
 qt_standard_project_setup()
 
 add_subdirectory(${PROJECT_NAME}/)
