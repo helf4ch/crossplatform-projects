@@ -108,6 +108,7 @@ public:
     std::string dumped = query_data.dump();
 
     std::string response_str = "HTTP/1.1 200 OK\r\n"
+                               "Access-Control-Allow-Origin: *\r\n"
                                "Content-Type: application/json\r\n"
                                "Content-Lenght: " +
                                std::to_string(dumped.size()) +
